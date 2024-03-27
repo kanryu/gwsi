@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math"
+	"runtime"
 	"unsafe"
 
 	"github.com/go-gl/gl/v2.1/gl"
@@ -50,6 +51,12 @@ var (
 		egl.EGL_NONE,
 	}
 )
+
+func init() {
+	// This is needed to arrange that main() runs on main thread.
+	// See documentation for functions that are only allowed to be called from the main thread.
+	runtime.LockOSThread()
+}
 
 func calc_angle(i int, teeth int) float64 {
 	return float64(i) * TAU_F / float64(teeth)
@@ -324,12 +331,11 @@ func main() {
 
 	info = libwsi.NewWsiWindowCreateInfo(
 		libwsi.WSI_STRUCTURE_TYPE_WINDOW_CREATE_INFO,
-		"Gears",
 		libwsi.WsiExtent{Width: 300, Height: 300},
 	)
 	libwsi.RegisterWindowCallbacks(&info, configure_window, close_window)
 
-	res = libwsi.WsiCreateWindow(g_platform, &info, &g_window)
+	res = libwsi.WsiCreateWindow(g_platform, &info, &g_window, "gears")
 	if res != libwsi.WSI_SUCCESS {
 		fmt.Printf("wsiCreateWindow failed: %d\n", res)
 		goto err_wsi_window

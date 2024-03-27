@@ -5,12 +5,14 @@ package libwsi
 
 import (
 	"libwsi_test/egl"
+	"runtime"
 	"unsafe"
 )
 
 /*
 #cgo linux LDFLAGS: -L/home/ubuntu/work/libwsi/install/lib/aarch64-linux-gnu -lwsi
 
+#include <stdlib.h>
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 
@@ -68,12 +70,14 @@ type InnerWindowCallbacks struct {
 	CloseWindowCallback     PFN_CloseWindowCallback
 }
 
+var callbacks InnerWindowCallbacks
+
 func RegisterWindowCallbacks(info *WsiWindowCreateInfo, configure PFN_ConfigureWindowCallback, close PFN_CloseWindowCallback) {
-	callbacks := &InnerWindowCallbacks{
+	callbacks = InnerWindowCallbacks{
 		ConfigureWindowCallback: configure,
 		CloseWindowCallback:     close,
 	}
-	info.PUserData = unsafe.Pointer(callbacks)
+	info.PUserData = unsafe.Pointer(&callbacks)
 	info.PfnConfigureWindow = C.PFN_wsiConfigureWindow(C.configure_window_callback)
 	info.PfnCloseWindow = C.PFN_wsiCloseWindow(C.close_window_callback)
 }
@@ -85,11 +89,9 @@ func NewWsiPlatformCreateInfo(structureType WsiStructureType) WsiPlatformCreateI
 	}
 	return platform_info
 }
-func NewWsiWindowCreateInfo(structureType WsiStructureType, title string, extent WsiExtent) WsiWindowCreateInfo {
-	ptitle := C.CString("title")
+func NewWsiWindowCreateInfo(structureType WsiStructureType, extent WsiExtent) WsiWindowCreateInfo {
 	windowInfo := WsiWindowCreateInfo{
 		SType:  C.int32_t(structureType),
-		PTitle: ptitle,
 		Extent: C.WsiExtent(extent),
 	}
 	return windowInfo
@@ -134,9 +136,16 @@ func WsiDestroyWindowEGLSurface(window WsiWindow, dpy egl.EGLDisplay, surface eg
 
 // window
 
-func WsiCreateWindow(platform WsiPlatform, pCreateInfo *WsiWindowCreateInfo, pWindow *WsiWindow) WsiResult {
+func WsiCreateWindow(platform WsiPlatform, pCreateInfo *WsiWindowCreateInfo, pWindow *WsiWindow, title string) WsiResult {
+	ttl := C.CString(title)
+	p := runtime.Pinner{}
+	p.Pin(ttl)
+	defer C.free(unsafe.Pointer(ttl))
+	defer p.Unpin()
+	pCreateInfo.PTitle = ttl
 	var window C.WsiWindow
 	result := C.wsiCreateWindow(C.WsiPlatform(platform), (*C.WsiWindowCreateInfo)(unsafe.Pointer(pCreateInfo)), &window)
+	pCreateInfo.PTitle = nil
 	if WsiResult(result) == WSI_SUCCESS {
 		*pWindow = WsiWindow(window)
 	}
