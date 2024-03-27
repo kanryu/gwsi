@@ -4,8 +4,6 @@
 package libwsi
 
 import (
-	"libwsi_test/egl"
-	"runtime"
 	"unsafe"
 )
 
@@ -33,32 +31,58 @@ void configure_window_callback(void *pUserData, const WsiConfigureWindowEvent *p
 {
 	InnerWindowCallbacks* inner;
 	inner = (InnerWindowCallbacks*)pUserData;
-	inner->ConfigureWindowCallback(pUserData, pConfig);
+	inner.ConfigureWindowCallback(pUserData, pConfig);
 }
 void close_window_callback(void *pUserData, const WsiCloseWindowEvent *pClose)
 {
 	InnerWindowCallbacks* inner;
 	inner = (InnerWindowCallbacks*)pUserData;
-	inner->CloseWindowCallback(pUserData, pClose);
+	inner.CloseWindowCallback(pUserData, pClose);
 }
 */
 import "C"
 
-type WsiPlatform C.WsiPlatform
-type WsiSeat C.WsiSeat
-type WsiWindow C.WsiWindow
+type WsiPlatformCreateInfo struct {
+	Type WsiStructureType
+	Next string
+}
 
-type WsiPlatformCreateInfo C.WsiPlatformCreateInfo
-type WsiWindowCreateInfo C.WsiWindowCreateInfo
+type WsiWindowCreateInfo struct {
+	Type               WsiStructureType
+	Parent             WsiWindow
+	Extent             WsiExtent
+	Next               uintptr
+	Title              string
+	UserData           uintptr
+	pfnConfigureWindow PFN_wsiConfigureWindow
+	pfnCloseWindow     PFN_wsiCloseWindow
+}
 
-type WsiConfigureWindowEvent C.WsiConfigureWindowEvent
-type WsiCloseWindowEvent C.WsiCloseWindowEvent
+type WsiConfigureWindowEvent struct {
+	Base   WsiEvent
+	Window WsiWindow
+	Extent WsiExtent
+}
 
-type PFN_wsiConfigureWindow C.PFN_wsiConfigureWindow
-type PFN_wsiCloseWindow C.PFN_wsiCloseWindow
+type WsiCloseWindowEvent struct {
+	Base   WsiEvent
+	Window WsiWindow
+}
 
-type WsiExtent C.WsiExtent
-type WsiEvent C.WsiEvent
+type PFN_wsiConfigureWindow func(pUserData uintptr, pConfig *WsiConfigureWindowEvent)
+type PFN_wsiCloseWindow func(pUserData uintptr, pClose *WsiCloseWindowEvent)
+
+type WsiExtent struct {
+	Width  int32
+	Height int32
+}
+
+type WsiEvent struct {
+	Type   WsiEventType
+	Flags  uint32
+	Serial uint32
+	Time   int64
+}
 
 type PFN_ConfigureWindowCallback func(unsafe.Pointer, *WsiConfigureWindowEvent)
 type PFN_CloseWindowCallback func(unsafe.Pointer, *WsiCloseWindowEvent)
@@ -97,66 +121,66 @@ func NewWsiWindowCreateInfo(structureType WsiStructureType, extent WsiExtent) Ws
 	return windowInfo
 }
 
-func WsiCreatePlatform(pCreateInfo *WsiPlatformCreateInfo, pPlatform *WsiPlatform) WsiResult {
-	var pf C.WsiPlatform
-	result := C.wsiCreatePlatform((*C.WsiPlatformCreateInfo)(unsafe.Pointer(pCreateInfo)), &pf)
-	if WsiResult(result) == WSI_SUCCESS {
-		*pPlatform = WsiPlatform(pf)
-	}
-	return WsiResult(result)
-}
+// func WsiCreatePlatform(pCreateInfo *WsiPlatformCreateInfo, pPlatform *WsiPlatform) WsiResult {
+// 	var pf C.WsiPlatform
+// 	result := C.wsiCreatePlatform((*C.WsiPlatformCreateInfo)(unsafe.Pointer(pCreateInfo)), &pf)
+// 	if WsiResult(result) == WSI_SUCCESS {
+// 		*pPlatform = WsiPlatform(pf)
+// 	}
+// 	return WsiResult(result)
+// }
 
-func WsiDestroyPlatform(platform WsiPlatform) {
-	C.wsiDestroyPlatform(C.WsiPlatform(platform))
-}
+// func WsiDestroyPlatform(platform WsiPlatform) {
+// 	C.wsiDestroyPlatform(C.WsiPlatform(platform))
+// }
 
 // EGL
 
-func WsiGetEGLDisplay(platform WsiPlatform, pDisplay *egl.EGLDisplay) WsiResult {
-	var disp C.EGLDisplay
-	result := C.wsiGetEGLDisplay(C.WsiPlatform(platform), &disp)
-	if WsiResult(result) == WSI_SUCCESS {
-		*pDisplay = egl.EGLDisplay(disp)
-	}
-	return WsiResult(result)
-}
+// func WsiGetEGLDisplay(platform WsiPlatform, pDisplay *egl.EGLDisplay) WsiResult {
+// 	var disp C.EGLDisplay
+// 	result := C.wsiGetEGLDisplay(C.WsiPlatform(platform), &disp)
+// 	if WsiResult(result) == WSI_SUCCESS {
+// 		*pDisplay = egl.EGLDisplay(disp)
+// 	}
+// 	return WsiResult(result)
+// }
 
-func WsiCreateWindowEGLSurface(window WsiWindow, dpy egl.EGLDisplay, config egl.EGLConfig, pSurface *egl.EGLSurface) WsiResult {
-	var surface C.EGLSurface
-	result := C.wsiCreateWindowEGLSurface(C.WsiWindow(window), C.EGLDisplay(dpy), C.EGLConfig(config), &surface)
-	if WsiResult(result) == WSI_SUCCESS {
-		*pSurface = egl.EGLSurface(surface)
-	}
-	return WsiResult(result)
-}
+// func WsiCreateWindowEGLSurface(window WsiWindow, dpy egl.EGLDisplay, config egl.EGLConfig, pSurface *egl.EGLSurface) WsiResult {
+// 	var surface C.EGLSurface
+// 	result := C.wsiCreateWindowEGLSurface(C.WsiWindow(window), C.EGLDisplay(dpy), C.EGLConfig(config), &surface)
+// 	if WsiResult(result) == WSI_SUCCESS {
+// 		*pSurface = egl.EGLSurface(surface)
+// 	}
+// 	return WsiResult(result)
+// }
 
-func WsiDestroyWindowEGLSurface(window WsiWindow, dpy egl.EGLDisplay, surface egl.EGLSurface) {
-	C.wsiDestroyWindowEGLSurface(C.WsiWindow(window), C.EGLDisplay(dpy), C.EGLSurface(surface))
-}
+// func WsiDestroyWindowEGLSurface(window WsiWindow, dpy egl.EGLDisplay, surface egl.EGLSurface) {
+// 	C.wsiDestroyWindowEGLSurface(C.WsiWindow(window), C.EGLDisplay(dpy), C.EGLSurface(surface))
+// }
 
 // window
 
-func WsiCreateWindow(platform WsiPlatform, pCreateInfo *WsiWindowCreateInfo, pWindow *WsiWindow, title string) WsiResult {
-	ttl := C.CString(title)
-	p := runtime.Pinner{}
-	p.Pin(ttl)
-	defer C.free(unsafe.Pointer(ttl))
-	defer p.Unpin()
-	pCreateInfo.PTitle = ttl
-	var window C.WsiWindow
-	result := C.wsiCreateWindow(C.WsiPlatform(platform), (*C.WsiWindowCreateInfo)(unsafe.Pointer(pCreateInfo)), &window)
-	pCreateInfo.PTitle = nil
-	if WsiResult(result) == WSI_SUCCESS {
-		*pWindow = WsiWindow(window)
-	}
-	return WsiResult(result)
-}
+// func WsiCreateWindow(platform WsiPlatform, pCreateInfo *WsiWindowCreateInfo, pWindow *WsiWindow, title string) WsiResult {
+// 	ttl := C.CString(title)
+// 	p := runtime.Pinner{}
+// 	p.Pin(ttl)
+// 	defer C.free(unsafe.Pointer(ttl))
+// 	defer p.Unpin()
+// 	pCreateInfo.PTitle = ttl
+// 	var window C.WsiWindow
+// 	result := C.wsiCreateWindow(C.WsiPlatform(platform), (*C.WsiWindowCreateInfo)(unsafe.Pointer(pCreateInfo)), &window)
+// 	pCreateInfo.PTitle = nil
+// 	if WsiResult(result) == WSI_SUCCESS {
+// 		*pWindow = WsiWindow(window)
+// 	}
+// 	return WsiResult(result)
+// }
 
-func WsiDestroyWindow(window WsiWindow) {
-	C.wsiDestroyWindow(C.WsiWindow((window)))
-}
+// func WsiDestroyWindow(window WsiWindow) {
+// 	C.wsiDestroyWindow(C.WsiWindow((window)))
+// }
 
-func WsiDispatchEvents(platform WsiPlatform, timeout int64) WsiResult {
-	result := C.wsiDispatchEvents(C.WsiPlatform(platform), C.int64_t(timeout))
-	return WsiResult(result)
-}
+// func WsiDispatchEvents(platform WsiPlatform, timeout int64) WsiResult {
+// 	result := C.wsiDispatchEvents(C.WsiPlatform(platform), C.int64_t(timeout))
+// 	return WsiResult(result)
+// }

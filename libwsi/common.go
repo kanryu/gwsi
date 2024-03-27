@@ -3,6 +3,7 @@ package libwsi
 type WsiOutput uint64
 
 type WsiResult int
+type WsiEventType int
 type WsiStructureType int32
 
 const (
@@ -27,10 +28,11 @@ const (
 	WSI_ERROR_WINDOW_IN_USE WsiResult = -13
 	WSI_RESULT_ENUM_MAX     WsiResult = WSI_TYPE_MAX
 
-	WSI_EVENT_TYPE_CLOSE_WINDOW     = 1
-	WSI_EVENT_TYPE_CONFIGURE_WINDOW = 2
-	WSI_EVENT_TYPE_ENUM_MAX         = WSI_TYPE_MAX
-	WSI_TYPE_MAX                    = 100
+	WSI_EVENT_TYPE_CLOSE_WINDOW     WsiEventType = 1
+	WSI_EVENT_TYPE_CONFIGURE_WINDOW WsiEventType = 2
+	WSI_EVENT_TYPE_ENUM_MAX         WsiEventType = WSI_TYPE_MAX
+
+	WSI_TYPE_MAX = 100
 )
 
 const (
