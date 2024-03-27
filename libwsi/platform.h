@@ -8,8 +8,8 @@ extern "C" {
 #endif
 
 typedef struct WsiPlatformCreateInfo {
-    WsiStructureType sType;
-    const void *pNext;
+    int32_t SType;
+    const void *PNext;
 } WsiPlatformCreateInfo;
 
 typedef WsiResult (*PFN_wsiCreatePlatform)(const WsiPlatformCreateInfo *pCreateInfo, WsiPlatform *pPlatform);

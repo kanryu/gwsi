@@ -1,12 +1,15 @@
 package main
 
 import (
+	"fmt"
 	"math"
+	"unsafe"
 
 	"github.com/go-gl/gl/v2.1/gl"
 
-	"libwsi_test/internal/egl"
+	"libwsi_test/egl"
 	"libwsi_test/libwsi"
+	"libwsi_test/linux"
 )
 
 const (
@@ -26,25 +29,25 @@ var (
 	g_view_rotx float64 = 20.0
 	g_view_roty float64 = 30.0
 	g_view_rotz float64 = 0.0
-	g_gear1     uint
-	g_gear2     uint
-	g_gear3     uint
+	g_gear1     uint32
+	g_gear2     uint32
+	g_gear3     uint32
 	g_angle     float64 = 0.0
 
 	g_config_attribs = []egl.EGLint{
-		egl.egl.EGL_SURFACE_TYPE, egl.egl.EGL_WINDOW_BIT,
-		egl.egl.EGL_RED_SIZE, 8,
-		egl.egl.EGL_GREEN_SIZE, 8,
-		egl.egl.EGL_BLUE_SIZE, 8,
-		egl.egl.EGL_ALPHA_SIZE, 8,
-		egl.egl.EGL_DEPTH_SIZE, 24,
-		egl.egl.EGL_RENDERABLE_TYPE, egl.egl.EGL_OPENGL_BIT,
-		egl.egl.EGL_NONE,
+		egl.EGL_SURFACE_TYPE, egl.EGL_WINDOW_BIT,
+		egl.EGL_RED_SIZE, 8,
+		egl.EGL_GREEN_SIZE, 8,
+		egl.EGL_BLUE_SIZE, 8,
+		egl.EGL_ALPHA_SIZE, 8,
+		egl.EGL_DEPTH_SIZE, 24,
+		egl.EGL_RENDERABLE_TYPE, egl.EGL_OPENGL_BIT,
+		egl.EGL_NONE,
 	}
 	g_context_attribs = []egl.EGLint{
-		egl.egl.EGL_CONTEXT_MAJOR_VERSION, 2,
-		egl.egl.EGL_CONTEXT_MINOR_VERSION, 0,
-		egl.egl.EGL_NONE,
+		egl.EGL_CONTEXT_MAJOR_VERSION_KHR, 2,
+		egl.EGL_CONTEXT_MINOR_VERSION_KHR, 0,
+		egl.EGL_NONE,
 	}
 )
 
@@ -66,344 +69,346 @@ func gear(
 
 	da := TAU_F / float64(teeth) / 4.0
 
-	gl.ShadeModel(gl.GL_FLAT)
+	gl.ShadeModel(gl.FLAT)
 	gl.Normal3f(0.0, 0.0, 1.0)
 
-	gl.Begin(gl.GL_QUAD_STRIP)
+	gl.Begin(gl.QUAD_STRIP)
 	for i := 0; i <= teeth; i++ {
 		angle := calc_angle(i, teeth)
 
-		gl.Vertex3f(r0*math.Cos(angle), r0*math.Sin(angle), width*0.5)
-		gl.Vertex3f(r1*math.Cos(angle), r1*math.Sin(angle), width*0.5)
+		gl.Vertex3f(float32(r0*math.Cos(angle)), float32(r0*math.Sin(angle)), float32(width*0.5))
+		gl.Vertex3f(float32(r1*math.Cos(angle)), float32(r1*math.Sin(angle)), float32(width*0.5))
 		if i < teeth {
-			gl.Vertex3f(r0*math.Cos(angle), r0*math.Sin(angle), width*0.5)
-			gl.Vertex3f(r1*math.Cos(angle+3.0*da), r1*math.Sin(angle+3.0*da), width*0.5)
+			gl.Vertex3f(float32(r0*math.Cos(angle)), float32(r0*math.Sin(angle)), float32(width*0.5))
+			gl.Vertex3f(float32(r1*math.Cos(angle+3.0*da)), float32(r1*math.Sin(angle+3.0*da)), float32(width*0.5))
 		}
 	}
 	gl.End()
 
-	gl.Begin(gl.GL_QUADS)
+	gl.Begin(gl.QUADS)
 	for i := 0; i < teeth; i++ {
 		angle := calc_angle(i, teeth)
 
-		gl.Vertex3f(r1*math.Cos(angle), r1*math.Sin(angle), width*0.5)
-		gl.Vertex3f(r2*math.Cos(angle+da), r2*math.Sin(angle+da), width*0.5)
-		gl.Vertex3f(r2*math.Cos(angle+2.0*da), r2*math.Sin(angle+2.0*da), width*0.5)
-		gl.Vertex3f(r1*math.Cos(angle+3.0*da), r1*math.Sin(angle+3.0*da), width*0.5)
+		gl.Vertex3f(float32(r1*math.Cos(angle)), float32(r1*math.Sin(angle)), float32(width*0.5))
+		gl.Vertex3f(float32(r2*math.Cos(angle+da)), float32(r2*math.Sin(angle+da)), float32(width*0.5))
+		gl.Vertex3f(float32(r2*math.Cos(angle+2.0*da)), float32(r2*math.Sin(angle+2.0*da)), float32(width*0.5))
+		gl.Vertex3f(float32(r1*math.Cos(angle+3.0*da)), float32(r1*math.Sin(angle+3.0*da)), float32(width*0.5))
 	}
 	gl.End()
 
 	gl.Normal3f(0.0, 0.0, -1.0)
 
-	gl.Begin(gl.GL_QUAD_STRIP)
+	gl.Begin(gl.QUAD_STRIP)
 	for i := 0; i < teeth; i++ {
 		angle := calc_angle(i, teeth)
 
-		gl.Vertex3f(r1*math.Cos(angle), r1*math.Sin(angle), -width*0.5)
-		gl.Vertex3f(r0*math.Cos(angle), r0*math.Sin(angle), -width*0.5)
+		gl.Vertex3f(float32(r1*math.Cos(angle)), float32(r1*math.Sin(angle)), float32(-width*0.5))
+		gl.Vertex3f(float32(r0*math.Cos(angle)), float32(r0*math.Sin(angle)), float32(-width*0.5))
 		if i < teeth {
-			gl.Vertex3f(r1*math.Cos(angle+3.0*da), r1*math.Sin(angle+3.0*da), -width*0.5)
-			gl.Vertex3f(r0*math.Cos(angle), r0*math.Sin(angle), -width*0.5)
+			gl.Vertex3f(float32(r1*math.Cos(angle+3.0*da)), float32(r1*math.Sin(angle+3.0*da)), float32(-width*0.5))
+			gl.Vertex3f(float32(r0*math.Cos(angle)), float32(r0*math.Sin(angle)), float32(-width*0.5))
 		}
 	}
 	gl.End()
 
-	gl.Begin(gl.GL_QUADS)
+	gl.Begin(gl.QUADS)
 	for i := 0; i < teeth; i++ {
 		angle := calc_angle(i, teeth)
 
-		gl.Vertex3f(r1*math.Cos(angle+3.0*da), r1*math.Sin(angle+3.0*da), -width*0.5)
-		gl.Vertex3f(r2*math.Cos(angle+2.0*da), r2*math.Sin(angle+2.0*da), -width*0.5)
-		gl.Vertex3f(r2*math.Cos(angle+da), r2*math.Sin(angle+da), -width*0.5)
-		gl.Vertex3f(r1*math.Cos(angle), r1*math.Sin(angle), -width*0.5)
+		gl.Vertex3f(float32(r1*math.Cos(angle+3.0*da)), float32(r1*math.Sin(angle+3.0*da)), float32(-width*0.5))
+		gl.Vertex3f(float32(r2*math.Cos(angle+2.0*da)), float32(r2*math.Sin(angle+2.0*da)), float32(-width*0.5))
+		gl.Vertex3f(float32(r2*math.Cos(angle+da)), float32(r2*math.Sin(angle+da)), float32(-width*0.5))
+		gl.Vertex3f(float32(r1*math.Cos(angle)), float32(r1*math.Sin(angle)), float32(-width*0.5))
 	}
-	gl.nd()
+	gl.End()
 
-	gl.Begin(gl.GL_QUAD_STRIP)
+	gl.Begin(gl.QUAD_STRIP)
 	for i := 0; i < teeth; i++ {
 		angle := calc_angle(i, teeth)
 
-		gl.Vertex3f(r1*math.Cos(angle), r1*math.Sin(angle), width*0.5)
-		gl.Vertex3f(r1*math.Cos(angle), r1*math.Sin(angle), -width*0.5)
+		gl.Vertex3f(float32(r1*math.Cos(angle)), float32(r1*math.Sin(angle)), float32(width*0.5))
+		gl.Vertex3f(float32(r1*math.Cos(angle)), float32(r1*math.Sin(angle)), float32(-width*0.5))
 		u := r2*math.Cos(angle+da) - r1*math.Cos(angle)
 		v := r2*math.Sin(angle+da) - r1*math.Sin(angle)
 		leng := math.Sqrt(u*u + v*v)
 		u /= leng
 		v /= leng
-		gl.Normal3f(v, -u, 0.0)
-		gl.Vertex3f(r2*math.Cos(angle+da), r2*math.Sin(angle+da), width*0.5)
-		gl.Vertex3f(r2*math.Cos(angle+da), r2*math.Sin(angle+da), -width*0.5)
-		gl.Normal3f(math.Cos(angle), math.Sin(angle), 0.0)
-		gl.Vertex3f(r2*math.Cos(angle+2.0*da), r2*math.Sin(angle+2.0*da), width*0.5)
-		gl.Vertex3f(r2*math.Cos(angle+2.0*da), r2*math.Sin(angle+2.0*da), -width*0.5)
+		gl.Normal3f(float32(v), float32(-u), 0.0)
+		gl.Vertex3f(float32(r2*math.Cos(angle+da)), float32(r2*math.Sin(angle+da)), float32(width*0.5))
+		gl.Vertex3f(float32(r2*math.Cos(angle+da)), float32(r2*math.Sin(angle+da)), float32(-width*0.5))
+		gl.Normal3f(float32(math.Cos(angle)), float32(math.Sin(angle)), float32(0.0))
+		gl.Vertex3f(float32(r2*math.Cos(angle+2.0*da)), float32(r2*math.Sin(angle+2.0*da)), float32(width*0.5))
+		gl.Vertex3f(float32(r2*math.Cos(angle+2.0*da)), float32(r2*math.Sin(angle+2.0*da)), float32(-width*0.5))
 		u = r1*math.Cos(angle+3.0*da) - r2*math.Cos(angle+2.0*da)
 		v = r1*math.Sin(angle+3.0*da) - r2*math.Sin(angle+2.0*da)
-		gl.Normal3f(v, -u, 0.0)
-		gl.Vertex3f(r1*math.Cos(angle+3.0*da), r1*math.Sin(angle+3.0*da), width*0.5)
-		gl.Vertex3f(r1*math.Cos(angle+3.0*da), r1*math.Sin(angle+3.0*da), -width*0.5)
-		gl.Normal3f(math.Cos(angle), math.Sin(angle), 0.0)
+		gl.Normal3f(float32(v), float32(-u), 0.0)
+		gl.Vertex3f(float32(r1*math.Cos(angle+3.0*da)), float32(r1*math.Sin(angle+3.0*da)), float32(width*0.5))
+		gl.Vertex3f(float32(r1*math.Cos(angle+3.0*da)), float32(r1*math.Sin(angle+3.0*da)), float32(-width*0.5))
+		gl.Normal3f(float32(math.Cos(angle)), float32(math.Sin(angle)), float32(0.0))
 	}
 
-	gl.Vertex3f(r1*math.Cos(0), r1*math.Sin(0), width*0.5)
-	gl.Vertex3f(r1*math.Cos(0), r1*math.Sin(0), -width*0.5)
+	gl.Vertex3f(float32(r1*math.Cos(0)), float32(r1*math.Sin(0)), float32(width*0.5))
+	gl.Vertex3f(float32(r1*math.Cos(0)), float32(r1*math.Sin(0)), float32(-width*0.5))
 
 	gl.End()
 
-	gl.ShadeModel(gl.GL_SMOOTH)
+	gl.ShadeModel(gl.SMOOTH)
 
-	gl.Begin(gl.GL_QUAD_STRIP)
+	gl.Begin(gl.QUAD_STRIP)
 	for i := 0; i <= teeth; i++ {
 		angle := calc_angle(i, teeth)
-		gl.Normal3f(-math.Cos(angle), -math.Sin(angle), 0.0)
-		gl.Vertex3f(r0*math.Cos(angle), r0*math.Sin(angle), -width*0.5)
-		gl.Vertex3f(r0*math.Cos(angle), r0*math.Sin(angle), width*0.5)
+		gl.Normal3f(float32(-math.Cos(angle)), float32(-math.Sin(angle)), float32(0.0))
+		gl.Vertex3f(float32(r0*math.Cos(angle)), float32(r0*math.Sin(angle)), float32(-width*0.5))
+		gl.Vertex3f(float32(r0*math.Cos(angle)), float32(r0*math.Sin(angle)), float32(width*0.5))
 	}
 	gl.End()
 }
 
 func draw() {
-    if g_resized {
-        gl.Viewport(0, 0, (GLsizei) g_extent.Width, (GLsizei) g_extent.Height)
+	if g_resized {
+		gl.Viewport(0, 0, int32(g_extent.Width), int32(g_extent.Height))
 
-        gl.MatrixMode(gl.GL_PROJECTION)
-        gl.LoadIdentity()
+		gl.MatrixMode(gl.PROJECTION)
+		gl.LoadIdentity()
 
-        hf := float64(g_extent.Height)
-        wf := float64(g_extent.Width)
+		hf := float64(g_extent.Height)
+		wf := float64(g_extent.Width)
 
-        if (hf > wf) {
-        	 aspect := hf / wf
-            gl.Frustum(-1.0, 1.0, -aspect, aspect, 5.0, 60.0)
-        } else {
-            aspect := wf / hf
-            gl.Frustum(-aspect, aspect, -1.0, 1.0, 5.0, 60.0)
-        }
+		if hf > wf {
+			aspect := hf / wf
+			gl.Frustum(-1.0, 1.0, -aspect, aspect, 5.0, 60.0)
+		} else {
+			aspect := wf / hf
+			gl.Frustum(-aspect, aspect, -1.0, 1.0, 5.0, 60.0)
+		}
 
-        gl.MatrixMode(gl.GL_MODELVIEW)
-        gl.LoadIdentity()
-        gl.Translatef(0.0, 0.0, -40.0)
-        g_resized = false
-    }
+		gl.MatrixMode(gl.MODELVIEW)
+		gl.LoadIdentity()
+		gl.Translatef(0.0, 0.0, -40.0)
+		g_resized = false
+	}
 
-    gl.ClearColor(0.0, 0.0, 0.0, 0.8f)
-    gl.Clear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+	gl.ClearColor(0.0, 0.0, 0.0, 0.8)
+	gl.Clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
-    gl.PushMatrix()
-    gl.Rotatef(g_view_rotx, 1.0, 0.0, 0.0)
-    gl.Rotatef(g_view_roty, 0.0, 1.0, 0.0)
-    gl.Rotatef(g_view_rotz, 0.0, 0.0, 1.0)
+	gl.PushMatrix()
+	gl.Rotatef(float32(g_view_rotx), 1.0, 0.0, 0.0)
+	gl.Rotatef(float32(g_view_roty), 0.0, 1.0, 0.0)
+	gl.Rotatef(float32(g_view_rotz), 0.0, 0.0, 1.0)
 
-    gl.PushMatrix()
-    gl.Translatef(-3.0, -2.0, 0.0)
-    gl.Rotatef(g_angle, 0.0, 0.0, 1.0)
-    gl.CallList(g_gear1)
-    gl.PopMatrix()
+	gl.PushMatrix()
+	gl.Translatef(-3.0, -2.0, 0.0)
+	gl.Rotatef(float32(g_angle), 0.0, 0.0, 1.0)
+	gl.CallList(uint32(g_gear1))
+	gl.PopMatrix()
 
-    gl.PushMatrix()
-    gl.Translatef(3.1f, -2.0, 0.0)
-    gl.Rotatef(-2.0 * g_angle - 9.0, 0.0, 0.0, 1.0)
-    gl.CallList(g_gear2)
-    gl.PopMatrix()
+	gl.PushMatrix()
+	gl.Translatef(3.1, -2.0, 0.0)
+	gl.Rotatef(float32(-2.0*g_angle-9.0), 0.0, 0.0, 1.0)
+	gl.CallList(uint32(g_gear2))
+	gl.PopMatrix()
 
-    gl.PushMatrix()
-    gl.Translatef(-3.1f, 4.2f, 0.0)
-    gl.Rotatef(-2.0 * g_angle - 25.0, 0.0, 0.0, 1.0)
-    gl.CallList(g_gear3)
-    gl.PopMatrix()
+	gl.PushMatrix()
+	gl.Translatef(-3.1, 4.2, 0.0)
+	gl.Rotatef(float32(-2.0*g_angle-25.0), 0.0, 0.0, 1.0)
+	gl.CallList(uint32(g_gear3))
+	gl.PopMatrix()
 
-    gl.PopMatrix()
+	gl.PopMatrix()
 }
 
-func create_gears(){
-    pos = []float64{ 5.0, 5.0, 10.0, 0.0 }
-    red = []float64{ 0.8, 0.1, 0.0, 1.0 }
-    green = []float64{ 0.0, 0.8, 0.2, 1.0 }
-    blue = []float64{ 0.2, 0.2, 1.0, 1.0 }
+func create_gears() {
+	pos := []float32{5.0, 5.0, 10.0, 0.0}
+	red := []float32{0.8, 0.1, 0.0, 1.0}
+	green := []float32{0.0, 0.8, 0.2, 1.0}
+	blue := []float32{0.2, 0.2, 1.0, 1.0}
 
-    gl.Lightfv(gl.GL_LIGHT0, gl.GL_POSITION, pos)
-    gl.Enable(gl.GL_CULL_FACE)
-    gl.Enable(gl.GL_LIGHTING)
-    gl.Enable(gl.GL_LIGHT0)
-    gl.Enable(gl.GL_DEPTH_TEST)
+	gl.Lightfv(gl.LIGHT0, gl.POSITION, &pos[0])
+	gl.Enable(gl.CULL_FACE)
+	gl.Enable(gl.LIGHTING)
+	gl.Enable(gl.LIGHT0)
+	gl.Enable(gl.DEPTH_TEST)
 
-    g_gear1 = gl.GenLists(1)
-    gl.NewList(g_gear1, gl.GL_COMPILE)
-    gl.Materialfv(gl.GL_FRONT, gl.GL_AMBIENT_AND_DIFFUSE, red)
-    gear(1.0, 4.0, 1.0, 20, 0.7)
-    gl.EndList()
+	g_gear1 = gl.GenLists(1)
+	gl.NewList(g_gear1, gl.COMPILE)
+	gl.Materialfv(gl.FRONT, gl.AMBIENT_AND_DIFFUSE, &red[0])
+	gear(1.0, 4.0, 1.0, 20, 0.7)
+	gl.EndList()
 
-    g_gear2 = gl.GenLists(1)
-    gl.NewList(g_gear2, gl.GL_COMPILE)
-    gl.Materialfv(gl.GL_FRONT, gl.GL_AMBIENT_AND_DIFFUSE, green)
-    gear(0.5, 2.0, 2.0, 10, 0.7)
-    gl.EndList()
+	g_gear2 = gl.GenLists(1)
+	gl.NewList(g_gear2, gl.COMPILE)
+	gl.Materialfv(gl.FRONT, gl.AMBIENT_AND_DIFFUSE, &green[0])
+	gear(0.5, 2.0, 2.0, 10, 0.7)
+	gl.EndList()
 
-    g_gear3 = gl.GenLists(1)
-    gl.NewList(g_gear3, gl.GL_COMPILE)
-    gl.Materialfv(gl.GL_FRONT, gl.GL_AMBIENT_AND_DIFFUSE, blue)
-    gear(1.3, 2.0, 0.5, 10, 0.7)
-    gl.EndList()
+	g_gear3 = gl.GenLists(1)
+	gl.NewList(g_gear3, gl.COMPILE)
+	gl.Materialfv(gl.FRONT, gl.AMBIENT_AND_DIFFUSE, &blue[0])
+	gear(1.3, 2.0, 0.5, 10, 0.7)
+	gl.EndList()
 
-    gl.Enable(GL_NORMALIZE)
+	gl.Enable(gl.NORMALIZE)
+}
+
+func configure_window(pUserData unsafe.Pointer, pConfig *libwsi.WsiConfigureWindowEvent) {
+	g_extent = libwsi.WsiExtent(pConfig.Extent)
+	g_resized = true
+}
+
+func close_window(pUserData unsafe.Pointer, pInfo *libwsi.WsiCloseWindowEvent) {
+	g_running = false
 }
 
 func main() {
-	int ret := -1
+	var info libwsi.WsiWindowCreateInfo
+	var num_configs egl.EGLint
+	var major, minor egl.EGLint
+	var ok bool
+	last_time := linux.GetTimeNs()
 
-    WsiPlatformCreateInfo platform_info = {
-        .sType = libwgi.WSI_STRUCTURE_TYPE_PLATFORM_CREATE_INFO,
-        .pNext = NULL,
-    }
+	platform_info := libwsi.NewWsiPlatformCreateInfo(libwsi.WSI_STRUCTURE_TYPE_PLATFORM_CREATE_INFO)
+	res := libwsi.WsiCreatePlatform(&platform_info, &g_platform)
+	if res != libwsi.WSI_SUCCESS {
+		fmt.Printf("wsiCreatePlatform failed: %d\n", res)
+		goto err_wsi_platform
+	}
 
-    WsiResult res = liwsi.WsiCreatePlatform(&platform_info, &g_platform)
-    if (res != libwgi.WSI_SUCCESS) {
-        fprintf(stderr, "wsiCreatePlatform failed: %d\n", res)
-        goto err_wsi_platform
-    }
+	res = libwsi.WsiGetEGLDisplay(g_platform, &g_display)
+	if res != libwsi.WSI_SUCCESS {
+		fmt.Printf("wsiGetEGLDisplay failed: %d", res)
+		if res == libwsi.WSI_ERROR_EGL {
+			fmt.Printf(" 0x%08x", egl.EglGetError())
+		}
+		fmt.Printf("\n")
+		goto err_wsi_display
+	}
 
-    res = liwsi.WsiGetEGLDisplay(g_platform, &g_display)
-    if (res != libwgi.WSI_SUCCESS) {
-        fprintf(stderr, "wsiGetEGLDisplay failed: %d", res)
-        if (res == libwgi.WSI_ERROR_EGL) {
-            fprintf(stderr, " 0x%08x", egl.EglGetError())
-        }
-        fprintf(stderr, "\n")
-        goto err_wsi_display
-    }
+	major, minor, ok = egl.EglInitialize(g_display)
+	if !ok {
+		fmt.Printf("eglInitialize failed: 0x%08x\n", egl.EglGetError())
+		goto err_egl_init
+	}
 
-    var major, minor egl.EGLint
-    EGLBoolean ok = egl.EglInitialize(g_display, &major, &minor)
-    if (ok == egl.EGL_FALSE) {
-        fprintf(stderr, "eglInitialize failed: 0x%08x\n", egl.EglGetError())
-        goto err_egl_init
-    }
+	if major < 1 || (major == 1 && minor < 4) {
+		fmt.Printf("EGL version %d.%d is too old\n", major, minor)
+		goto err_egl_version
+	}
 
-    if (major < 1 || (major == 1 && minor < 4)) {
-        fprintf(stderr, "EGL version %d.%d is too old\n", major, minor)
-        goto err_egl_version
-    }
+	ok = egl.EglBindAPI(egl.EGL_OPENGL_API)
+	if !ok {
+		fmt.Printf("eglBindAPI failed: 0x%08x\n", egl.EglGetError())
+		goto err_egl_bind
+	}
 
-    ok = egl.EglBindAPI(egl.EGL_OPENGL_API)
-    if (ok == egl.EGL_FALSE) {
-        fprintf(stderr, "eglBindAPI failed: 0x%08x\n", egl.EglGetError())
-        goto err_egl_bind
-    }
+	num_configs = egl.EGLint(1)
+	g_config, ok = egl.EglChooseConfig(g_display, g_config_attribs)
+	if !ok {
+		fmt.Printf("eglChooseConfig failed: 0x%08x\n", egl.EglGetError())
+		goto err_egl_config
+	}
 
-     num_configs  := egl.EGLint(1)
-    ok = egl.EglChooseConfig(g_display, g_config_attribs, &g_config, 1, &num_configs)
-    if (ok == egl.EGL_FALSE) {
-        fprintf(stderr, "eglChooseConfig failed: 0x%08x\n", egl.EglGetError())
-        goto err_egl_config
-    }
+	if num_configs == 0 {
+		fmt.Printf("eglChooseConfig failed: no configs found\n")
+		goto err_egl_config
+	}
 
-    if (num_configs == 0) {
-        fprintf(stderr, "eglChooseConfig failed: no configs found\n")
-        goto err_egl_config
-    }
+	g_context = egl.EglCreateContext(
+		g_display,
+		g_config,
+		egl.NilEGLContext,
+		g_context_attribs)
+	if g_context == egl.NilEGLContext {
+		fmt.Printf("eglCreateContext failed: 0x%08x\n", egl.EglGetError())
+		goto err_egl_context
+	}
 
-    g_context = egl.EglCreateContext(
-        g_display,
-        g_config,
-        egl.EGL_NO_CONTEXT,
-        g_context_attribs)
-    if (g_context == egl.EGL_NO_CONTEXT) {
-        fprintf(stderr, "eglCreateContext failed: 0x%08x\n", egl.EglGetError())
-        goto err_egl_context
-    }
+	info = libwsi.NewWsiWindowCreateInfo(
+		libwsi.WSI_STRUCTURE_TYPE_WINDOW_CREATE_INFO,
+		"Gears",
+		libwsi.WsiExtent{Width: 300, Height: 300},
+	)
+	libwsi.RegisterWindowCallbacks(&info, configure_window, close_window)
 
-    WsiWindowCreateInfo info = {
-        .sType = libwgi.WSI_STRUCTURE_TYPE_WINDOW_CREATE_INFO,
-        .pNext = NULL,
-        .extent.width = 300,
-        .extent.height = 300,
-        .pTitle = "Gears",
-        .pUserData = NULL,
-        .pfnCloseWindow = close_window,
-        .pfnConfigureWindow = configure_window,
-    }
+	res = libwsi.WsiCreateWindow(g_platform, &info, &g_window)
+	if res != libwsi.WSI_SUCCESS {
+		fmt.Printf("wsiCreateWindow failed: %d\n", res)
+		goto err_wsi_window
+	}
 
-    res = liwsi.WsiCreateWindow(g_platform, &info, &g_window)
-    if (res != libwgi.WSI_SUCCESS) {
-        fprintf(stderr, "wsiCreateWindow failed: %d\n", res)
-        goto err_wsi_window
-    }
+	for {
+		res = libwsi.WsiDispatchEvents(g_platform, -1)
+		if res != libwsi.WSI_SUCCESS || g_resized {
+			break
+		}
+	}
+	if res != libwsi.WSI_SUCCESS {
+		goto err_wsi_dispatch
+	}
 
-    while (true) {
-        res = liwsi.WsiDispatchEvents(g_platform, -1)
-        if (res != libwgi.WSI_SUCCESS || g_resized) {
-            break
-        }
-    }
-    if (res != libwgi.WSI_SUCCESS) {
-        goto err_wsi_dispatch
-    }
+	res = libwsi.WsiCreateWindowEGLSurface(g_window, g_display, g_config, &g_surface)
+	if res != libwsi.WSI_SUCCESS {
+		fmt.Printf("wsiCreateWindowEGLSurface failed: %d", res)
+		if res == libwsi.WSI_ERROR_EGL {
+			fmt.Printf(" 0x%08x", egl.EglGetError())
+		}
+		fmt.Printf("\n")
+		goto err_wsi_surface
+	}
 
-    res = liwsi.WsiCreateWindowEGLSurface(g_window, g_display, g_config, &g_surface)
-    if (res != libwgi.WSI_SUCCESS) {
-        fprintf(stderr, "wsiCreateWindowEGLSurface failed: %d", res)
-        if (res == libwgi.WSI_ERROR_EGL) {
-            fprintf(stderr, " 0x%08x", egl.EglGetError())
-        }
-        fprintf(stderr, "\n")
-        goto err_wsi_surface
-    }
+	ok = egl.EglMakeCurrent(g_display, g_surface, g_surface, g_context)
+	if !ok {
+		fmt.Printf("eglMakeCurrent failed: 0x%08x\n", egl.EglGetError())
+		goto err_egl_current
+	}
 
-    ok = egl.EglMakeCurrent(g_display, g_surface, g_surface, g_context)
-    if (ok == egl.EGL_FALSE) {
-        fprintf(stderr, "eglMakeCurrent failed: 0x%08x\n", egl.EglGetError())
-        goto err_egl_current
-    }
+	ok = egl.EglSwapInterval(g_display, 0)
+	if !ok {
+		fmt.Printf("eglSwapInterval failed: 0x%08x\n", egl.EglGetError())
+		goto err_egl_interval
+	}
 
-    ok = egl.EglSwapInterval(g_display, 0)
-    if (ok == egl.EGL_FALSE) {
-        fprintf(stderr, "eglSwapInterval failed: 0x%08x\n", egl.EglGetError())
-        goto err_egl_interval
-    }
+	create_gears()
 
-    create_gears()
+	last_time = linux.GetTimeNs()
 
-    int64_t last_time = get_time_ns()
+	for {
+		draw()
 
-    while(true) {
-        draw()
+		ok = egl.EglSwapBuffers(g_display, g_surface)
+		if !ok {
+			fmt.Printf("eglSwapBuffers failed: %d\n", egl.EglGetError())
+			break
+		}
 
-        ok = egl.EglSwapBuffers(g_display, g_surface)
-        if (ok == egl.EGL_FALSE) {
-            printf("eglSwapBuffers failed: %d\n", egl.EglGetError())
-            break
-        }
+		now := linux.GetTimeNs()
+		dt := now - last_time
+		last_time = now
 
-        int64_t now = get_time_ns()
-        int64_t dt = now - last_time
-        last_time = now
+		time := float64(dt) / 1000000000.0
+		g_angle += time * 70.0
+		g_angle = math.Mod(float64(g_angle), 360.0)
 
-        float time = (float)dt / 1000000000.0
-        g_angle += time * 70.0
-        g_angle = fmodf(g_angle, 360.0)
+		res = libwsi.WsiDispatchEvents(g_platform, 0)
+		if res != libwsi.WSI_SUCCESS || !g_running {
+			break
+		}
+	}
 
-        res = liwsi.WsiDispatchEvents(g_platform, 0)
-        if (res != libwgi.WSI_SUCCESS || !g_running) {
-            break
-        }
-    }
-
-    ret = EXIT_SUCCESS
 err_egl_interval:
 err_egl_current:
-	liwsi.WsiDestroyWindowEGLSurface(g_window, g_display, g_surface)
+	libwsi.WsiDestroyWindowEGLSurface(g_window, g_display, g_surface)
 err_wsi_surface:
 err_wsi_dispatch:
-	liwsi.WsiDestroyWindow(g_window)
+	libwsi.WsiDestroyWindow(g_window)
 err_wsi_window:
-    egl.EglDestroyContext(g_display, g_context)
+	egl.EglDestroyContext(g_display, g_context)
 err_egl_context:
 err_egl_config:
 err_egl_bind:
 err_egl_version:
-    egl.EglTerminate(g_display)
+	egl.EglTerminate(g_display)
 err_egl_init:
 err_wsi_display:
-	liwsi.WsiDestroyPlatform(g_platform)
+	libwsi.WsiDestroyPlatform(g_platform)
 err_wsi_platform:
-    return ret
 }

@@ -50,8 +50,8 @@ typedef enum WsiEventType {
 } WsiEventType;
 
 typedef struct WsiExtent {
-    int32_t width;
-    int32_t height;
+    int32_t Width;
+    int32_t Height;
 } WsiExtent;
 
 typedef struct WsiEvent {

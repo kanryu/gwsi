@@ -1,12 +1,9 @@
 package libwsi
 
-type WsiPlatform uintptr
-type WsiSeat uintptr
-type WsiWindow uintptr
 type WsiOutput uint64
 
 type WsiResult int
-type WsiStructureType int
+type WsiStructureType int32
 
 const (
 	WSI_SUCCESS             WsiResult = 0
@@ -42,18 +39,6 @@ const (
 	WSI_STRUCTURE_TYPE_WINDOW_CREATE_INFO   WsiStructureType = 2
 	WSI_STRUCTURE_TYPE_ENUM_MAX             WsiStructureType = WSI_TYPE_MAX
 )
-
-type WsiExtent struct {
-	Width  int32
-	Height int32
-}
-
-type WsiEvent struct {
-	Type   WsiStructureType
-	Flags  uint32
-	Serial uint32
-	Time   int64
-}
 
 // // egl.go
 
