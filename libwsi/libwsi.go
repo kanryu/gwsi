@@ -1,46 +1,6 @@
-//go:build linux || freebsd
-// +build linux freebsd
-
 package libwsi
 
-import (
-	"unsafe"
-)
-
-/*
-#cgo linux LDFLAGS: -L/home/ubuntu/work/libwsi/install/lib/aarch64-linux-gnu -lwsi
-
-#include <stdlib.h>
-#include <EGL/egl.h>
-#include <EGL/eglext.h>
-
-#include "common.h"
-#include "egl.h"
-#include "input.h"
-#include "output.h"
-#include "platform.h"
-#include "vulkan.h"
-#include "window.h"
-
-typedef struct InnerWindowCallbacks {
-	PFN_wsiConfigureWindow ConfigureWindowCallback;
-	PFN_wsiCloseWindow CloseWindowCallback;
-} InnerWindowCallbacks;
-
-void configure_window_callback(void *pUserData, const WsiConfigureWindowEvent *pConfig)
-{
-	InnerWindowCallbacks* inner;
-	inner = (InnerWindowCallbacks*)pUserData;
-	inner.ConfigureWindowCallback(pUserData, pConfig);
-}
-void close_window_callback(void *pUserData, const WsiCloseWindowEvent *pClose)
-{
-	InnerWindowCallbacks* inner;
-	inner = (InnerWindowCallbacks*)pUserData;
-	inner.CloseWindowCallback(pUserData, pClose);
-}
-*/
-import "C"
+import "unsafe"
 
 type WsiPlatformCreateInfo struct {
 	Type WsiStructureType
@@ -48,14 +8,14 @@ type WsiPlatformCreateInfo struct {
 }
 
 type WsiWindowCreateInfo struct {
-	Type               WsiStructureType
-	Parent             WsiWindow
-	Extent             WsiExtent
-	Next               uintptr
-	Title              string
-	UserData           uintptr
-	pfnConfigureWindow PFN_wsiConfigureWindow
-	pfnCloseWindow     PFN_wsiCloseWindow
+	Type            WsiStructureType
+	Parent          *WsiWindow
+	Extent          WsiExtent
+	Next            uintptr
+	Title           string
+	UserData        uintptr
+	ConfigureWindow PFN_wsiConfigureWindow
+	CloseWindow     PFN_wsiCloseWindow
 }
 
 type WsiConfigureWindowEvent struct {
@@ -69,8 +29,8 @@ type WsiCloseWindowEvent struct {
 	Window WsiWindow
 }
 
-type PFN_wsiConfigureWindow func(pUserData uintptr, pConfig *WsiConfigureWindowEvent)
-type PFN_wsiCloseWindow func(pUserData uintptr, pClose *WsiCloseWindowEvent)
+type PFN_wsiConfigureWindow func(pUserData unsafe.Pointer, pConfig *WsiConfigureWindowEvent)
+type PFN_wsiCloseWindow func(pUserData unsafe.Pointer, pClose *WsiCloseWindowEvent)
 
 type WsiExtent struct {
 	Width  int32
@@ -89,37 +49,37 @@ type PFN_CloseWindowCallback func(unsafe.Pointer, *WsiCloseWindowEvent)
 
 // platform
 
-type InnerWindowCallbacks struct {
-	ConfigureWindowCallback PFN_ConfigureWindowCallback
-	CloseWindowCallback     PFN_CloseWindowCallback
-}
+// type InnerWindowCallbacks struct {
+// 	ConfigureWindowCallback PFN_ConfigureWindowCallback
+// 	CloseWindowCallback     PFN_CloseWindowCallback
+// }
 
-var callbacks InnerWindowCallbacks
+// var callbacks InnerWindowCallbacks
 
-func RegisterWindowCallbacks(info *WsiWindowCreateInfo, configure PFN_ConfigureWindowCallback, close PFN_CloseWindowCallback) {
-	callbacks = InnerWindowCallbacks{
-		ConfigureWindowCallback: configure,
-		CloseWindowCallback:     close,
-	}
-	info.PUserData = unsafe.Pointer(&callbacks)
-	info.PfnConfigureWindow = C.PFN_wsiConfigureWindow(C.configure_window_callback)
-	info.PfnCloseWindow = C.PFN_wsiCloseWindow(C.close_window_callback)
-}
+// func RegisterWindowCallbacks(info *WsiWindowCreateInfo, configure PFN_ConfigureWindowCallback, close PFN_CloseWindowCallback) {
+// 	callbacks = InnerWindowCallbacks{
+// 		ConfigureWindowCallback: configure,
+// 		CloseWindowCallback:     close,
+// 	}
+// 	info.PUserData = unsafe.Pointer(&callbacks)
+// 	info.PfnConfigureWindow = C.PFN_wsiConfigureWindow(C.configure_window_callback)
+// 	info.PfnCloseWindow = C.PFN_wsiCloseWindow(C.close_window_callback)
+// }
 
-func NewWsiPlatformCreateInfo(structureType WsiStructureType) WsiPlatformCreateInfo {
-	platform_info := WsiPlatformCreateInfo{
-		SType: C.int32_t(structureType),
-		PNext: nil,
-	}
-	return platform_info
-}
-func NewWsiWindowCreateInfo(structureType WsiStructureType, extent WsiExtent) WsiWindowCreateInfo {
-	windowInfo := WsiWindowCreateInfo{
-		SType:  C.int32_t(structureType),
-		Extent: C.WsiExtent(extent),
-	}
-	return windowInfo
-}
+// func NewWsiPlatformCreateInfo(structureType WsiStructureType) WsiPlatformCreateInfo {
+// 	platform_info := WsiPlatformCreateInfo{
+// 		SType: C.int32_t(structureType),
+// 		PNext: nil,
+// 	}
+// 	return platform_info
+// }
+// func NewWsiWindowCreateInfo(structureType WsiStructureType, extent WsiExtent) WsiWindowCreateInfo {
+// 	windowInfo := WsiWindowCreateInfo{
+// 		SType:  C.int32_t(structureType),
+// 		Extent: C.WsiExtent(extent),
+// 	}
+// 	return windowInfo
+// }
 
 // func WsiCreatePlatform(pCreateInfo *WsiPlatformCreateInfo, pPlatform *WsiPlatform) WsiResult {
 // 	var pf C.WsiPlatform

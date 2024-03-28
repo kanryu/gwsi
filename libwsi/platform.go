@@ -5,198 +5,160 @@ package libwsi
 #include <string.h>
 
 #include <xcb/xcb.h>
-
-#include "utils.h"
-
-#include "common_priv.h"
-#include "platform_priv.h"
-#include "window_priv.h"
 */
 import "C"
-
-
-type WsiPlatform struct{
-     xcb_connection *xcb_connection_t
-         xcb_screen *xcb_screen_t
-                  xcb_screen_id int
-           xcb_atom_wm_protocols xcb_atom_t
-           xcb_atom_wm_delete_window xcb_atom_t
-      window_list wsi_list
-};
-
-var (
-	platform WsiPlatform
-	protocolTable map[string]*xcb_atom_t
+import (
+	"fmt"
+	"unsafe"
 )
 
-func wsi_query_extension(platform *WsiPlatform,  name string) bool{
-    cookie := C.xcb_query_extension(
-        platform.xcb_connection,
-        strlen(name),
-        name);
-
-    reply := C.xcb_query_extension_reply(
-        platform.xcb_connection,
-        cookie,
-        NULL);
-
-    present := false;
-    if reply {
-        present = reply.present;
-        free(reply);
-    }
-
-    return present;
+type WsiPlatform struct {
+	xcb_connection            *C.xcb_connection_t
+	xcb_screen                *C.xcb_screen_t
+	xcb_screen_id             C.int
+	xcb_atom_wm_protocols     C.xcb_atom_t
+	xcb_atom_wm_delete_window C.xcb_atom_t
+	WindowList                []*WsiWindow
 }
 
-func wsi_init_atoms(platform *WsiPlatform){
-	protocolTable["WM_PROTOCOLS"] = &platform.xcb_atom_wm_protocols
-	protocolTable["WM_DELETE_WINDOW"] = &platform.xcb_atom_wm_delete_window
+var (
+	mapAtoms     map[string]*C.xcb_atom_t
+	platformList []*WsiPlatform
+)
 
-    const size_t count = wsi_array_length(table);
-    xcb_intern_atom_cookie_t cookies[count];
+func (p *WsiPlatform) QueryExtension(name string) bool {
+	cookie := C.xcb_query_extension(
+		p.xcb_connection,
+		C.ushort(len(name)),
+		C.CString(name),
+	)
 
-    for (size_t i = 0; i < count; ++i) {
-        cookies[i] = xcb_intern_atom(
-            platform.xcb_connection, 0, strlen(table[i].name), table[i].name);
-    }
+	reply := C.xcb_query_extension_reply(
+		p.xcb_connection,
+		cookie,
+		nil)
 
-    for (size_t i = 0; i < count; ++i) {
-        xcb_intern_atom_reply_t *reply = xcb_intern_atom_reply(
-            platform.xcb_connection, cookies[i], NULL);
+	present := false
+	if reply != nil {
+		present = reply.present != 0
+		C.free(unsafe.Pointer(reply))
+	}
 
-        if (reply) {
-            *table[i].atom = reply.atom;
-            free(reply);
-        } else {
-            *table[i].atom = XCB_ATOM_NONE;
-        }
-    }
+	return present
 }
 
-func wsi_xcb_get_screen(setup *xcb_setup_t, int screen) *xcb_screen_t{
-    xcb_screen_iterator_t iter = xcb_setup_roots_iterator(setup);
-    for (; iter.rem; --screen, xcb_screen_next(&iter))
-    {
-        if (screen == 0) {
-            return iter.data;
-        }
-    }
+func (p *WsiPlatform) InitAtoms() {
+	mapAtoms["WM_PROTOCOLS"] = &p.xcb_atom_wm_protocols
+	mapAtoms["WM_DELETE_WINDOW"] = &p.xcb_atom_wm_delete_window
 
-    return NULL;
+	for name, atom := range mapAtoms {
+		cookie := C.xcb_intern_atom(
+			p.xcb_connection, 0, C.ushort(len(name)), C.CString(name))
+		reply := C.xcb_intern_atom_reply(
+			p.xcb_connection, cookie, nil)
+
+		if reply != nil {
+			*atom = reply.atom
+			C.free(unsafe.Pointer(reply))
+		} else {
+			*atom = C.XCB_ATOM_NONE
+		}
+	}
 }
 
-func wsi_find_window(platform *WsiPlatform, window xcb_window_t) *WsiWindow{
-    struct WsiWindow *WsiWindow = NULL;
-    wsi_list_for_each(WsiWindow, &platform.window_list, link) {
-        if (WsiWindow.xcb_window == window) {
-            return WsiWindow;
-        }
-    }
+func wsi_xcb_get_screen(setup *C.xcb_setup_t, screen int) *C.xcb_screen_t {
+	iter := C.xcb_setup_roots_iterator(setup)
+	for ; iter.rem != 0; screen-- {
+		if screen == 0 {
+			return iter.data
+		}
+		C.xcb_screen_next(&iter)
+	}
 
-    return NULL;
+	return nil
 }
 
-func wsi_platform_init(pCreateInfo *WsiPlatformCreateInfo, platform *WsiPlatform) WsiResult{
-    WsiResult result;
+func (p *WsiPlatform) FindWindow(window C.xcb_window_t) *WsiWindow {
+	for _, w := range p.WindowList {
+		if w.XcbWindow == window {
+			return w
+		}
+	}
 
-    wsi_list_init(&platform.window_list);
-
-    platform.xcb_connection = xcb_connect(NULL, &platform.xcb_screen_id);
-    int err = xcb_connection_has_error(platform.xcb_connection);
-    if (err > 0) {
-        result = WSI_ERROR_PLATFORM;
-        goto err_connect;
-    }
-
-    const xcb_setup_t *setup = xcb_get_setup(platform.xcb_connection);
-
-    platform.xcb_screen = wsi_xcb_get_screen(setup, platform.xcb_screen_id);
-    if (!platform.xcb_screen) {
-        result = WSI_ERROR_PLATFORM;
-        goto err_screen;
-    }
-
-    if (!wsi_query_extension(platform, "RANDR")) {
-        result = WSI_ERROR_PLATFORM;
-        goto err_extension;
-    }
-
-    if (!wsi_query_extension(platform, "XInputExtension")) {
-        result = WSI_ERROR_PLATFORM;
-        goto err_extension;
-    }
-
-    wsi_init_atoms(platform);
-
-    return WSI_SUCCESS;
-
-err_extension:
-err_screen:
-err_connect:
-    xcb_disconnect(platform.xcb_connection);
-    return result;
+	return nil
 }
 
-func wsi_platform_uninit(platform *WsiPlatform){
-    xcb_disconnect(platform.xcb_connection);
+func wsi_list_init(windowList []*WsiWindow) {
+
 }
 
-func WsiCreatePlatform(pCreateInfo *WsiPlatformCreateInfo, pPlatform *WsiPlatform) WsiResult {
-    struct WsiPlatform *p = calloc(1, sizeof(struct WsiPlatform));
-    if (!p) {
-        return WSI_ERROR_OUT_OF_MEMORY;
-    }
+func WsiCreatePlatform(pCreateInfo *WsiPlatformCreateInfo) (*WsiPlatform, error) {
+	platform := &WsiPlatform{}
+	result := WSI_ERROR_PLATFORM
 
-    WsiResult result = wsi_platform_init(pCreateInfo, p);
-    if (result != WSI_SUCCESS) {
-        free(p);
-        return result;
-    }
+	wsi_list_init(platform.WindowList)
+	platform.xcb_connection = C.xcb_connect(nil, &platform.xcb_screen_id)
+	defer func() {
+		if result != WSI_SUCCESS {
+			C.xcb_disconnect(platform.xcb_connection)
+			platform.xcb_connection = nil
+		}
+	}()
+	if err := C.xcb_connection_has_error(platform.xcb_connection); err > 0 {
+		return nil, fmt.Errorf("xcb_connect failed (%d)", err)
+	}
 
-    *pPlatform = p;
-    return WSI_SUCCESS;
+	setup := C.xcb_get_setup(platform.xcb_connection)
+
+	platform.xcb_screen = wsi_xcb_get_screen(setup, platform.xcb_screen_id)
+	if !platform.xcb_screen {
+		return nil, fmt.Errorf("xcb_get_screen failed")
+	}
+
+	if !platform.QueryExtension("RANDR") {
+		return nil, fmt.Errorf("extension RANDR not found")
+	}
+
+	if !platform.QueryExtension("XInputExtension") {
+		return nil, fmt.Errorf("extension XInputExtension not found")
+	}
+
+	platform.InitAtoms()
+	result = WSI_SUCCESS
+	return platform, nil
 }
 
-func WsiDestroyPlatform(platform WsiPlatform) {
-    wsi_platform_uninit(platform);
-    free(platform);
+func (p *WsiPlatform) Destroy() {
+	C.xcb_disconnect(p.xcb_connection)
 }
 
-func WsiDispatchEvents(platform WsiPlatform, timeout int64) WsiResult {
-    for {
-        xcb_generic_event_t *event = xcb_poll_for_event(platform.xcb_connection);
-        if (!event) {
-            break;
-        }
+func (p *WsiPlatform) DispatchEvents(timeout int64) WsiResult {
+	for {
+		event := C.xcb_poll_for_event(platform.xcb_connection)
+		if event == nil {
+			break
+		}
 
-        switch (event.response_type & ~0x80) {
-            case XCB_CONFIGURE_NOTIFY: {
-                xcb_configure_notify_event_t *notify
-                    = (xcb_configure_notify_event_t *)event;
+		switch event.response_type & ~0x80 {
+		case C.XCB_CONFIGURE_NOTIFY:
+			notify := (*C.xcb_configure_notify_event_t)(event)
+			window := p.FindWindow(notify.window)
+			if window != nil {
+				wsi_window_xcb_configure_notify(window, notify)
+			}
+			break
+		case C.XCB_CLIENT_MESSAGE:
+			message := (*C.xcb_client_message_event_t)(event)
 
-                struct WsiWindow *window
-                    = wsi_find_window(platform, notify.window);
-                if (window) {
-                    WsiWindow_xcb_configure_notify(window, notify);
-                }
-                break;
-            }
-            case XCB_CLIENT_MESSAGE: {
-                xcb_client_message_event_t *message
-                    = (xcb_client_message_event_t *)event;
+			window := p.FindWindow(message.window)
+			if window != nil {
+				wsi_window_xcb_client_message(window, message)
+			}
+			break
+		}
 
-                struct WsiWindow *window
-                    = wsi_find_window(platform, message.window);
-                if (window) {
-                    WsiWindow_xcb_client_message(window, message);
-                }
-                break;
-            }
-        }
+		C.free(event)
+	}
 
-        free(event);
-    }
-
-    return WSI_SUCCESS;
+	return WSI_SUCCESS
 }

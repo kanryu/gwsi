@@ -1,7 +1,8 @@
-package libegl
+package libwsi
 
 import (
-	"libwsi/egl"
+	"libwsi_test/egl"
+	"unsafe"
 )
 
 /*
@@ -11,79 +12,76 @@ import (
 
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
-
-#include "wsi/egl.h"
-#include "wsi/window.h"
-
-#include "utils.h"
-
-#include "common_priv.h"
-#include "platform_priv.h"
-#include "window_priv.h"
 */
 import "C"
 
-func WsiGetEGLDisplay(platform WsiPlatform, pDisplay *egl.EGLDisplay) WsiResult {
-    attrib := []egl.EGLAttrib {
-        egl.EGL_PLATFORM_XCB_SCREEN_EXT, platform.xcb_screen_id,
-        egl.EGL_NONE,
-    }
+func WsiGetEGLDisplay(platform *WsiPlatform, pDisplay *egl.EGLDisplay) WsiResult {
+	attrib := []egl.XCBAttrib{
+		egl.EGL_PLATFORM_XCB_SCREEN_EXT, egl.XCBAttrib(platform.xcb_screen_id),
+		egl.EGL_NONE,
+	}
 
-    *pDisplay = egl.eglGetPlatformDisplay(EGL_PLATFORM_XCB_EXT, platform.xcb_connection, attrib);
-    if *pDisplay == egl.EGL_NO_DISPLAY {
-        return WSI_ERROR_EGL
-    }
+	*pDisplay = egl.EglGetPlatformDisplay(egl.EGL_PLATFORM_XCB_EXT, unsafe.Pointer(platform.xcb_connection), attrib)
+	if *pDisplay == egl.NilEGLDisplay {
+		return WSI_ERROR_EGL
+	}
 
-    return WSI_SUCCESS
+	return WSI_SUCCESS
 }
 
-func WsiCreateWindowEGLSurface(window WsiWindow, dpy egl.EGLDisplay, config egl.EGLConfig, pSurface *egl.EGLSurface) WsiResult {
-    visualid := 0
-    ok := egl.eglGetConfigAttrib(dpy, config, EGL_NATIVE_VISUAL_ID, &visualid)
-    if (ok == EGL_FALSE) {
-        return WSI_ERROR_EGL
-    }
+func WsiCreateWindowEGLSurface(window *WsiWindow, dpy egl.EGLDisplay, config egl.EGLConfig, pSurface *egl.EGLSurface) WsiResult {
+	visualid := egl.EGLint(0)
+	if id, ok := egl.EglGetConfigAttrib(dpy, config, egl.EGL_NATIVE_VISUAL_ID); ok == false {
+		return WSI_ERROR_EGL
+	} else {
+		visualid = id
+	}
+	platform := window.Platform
 
-    window.xcb_colormap = xcb_generate_id(platform.xcb_connection)
-    if (window.xcb_colormap == UINT32_MAX) {
-        return WSI_ERROR_PLATFORM;
-    }
+	window.XcbColormap = C.xcb_generate_id(platform.xcb_connection)
+	if window.XcbColormap == C.UINT32_MAX {
+		return WSI_ERROR_PLATFORM
+	}
 
-    C.xcb_create_colormap_checked(
-        platform.xcb_connection,
-        XCB_COLORMAP_ALLOC_NONE,
-        window.xcb_colormap,
-        platform.xcb_screen.root,
-        (xcb_visualid_t)visualid)
+	C.xcb_create_colormap_checked(
+		platform.xcb_connection,
+		C.XCB_COLORMAP_ALLOC_NONE,
+		window.XcbColormap,
+		platform.xcb_screen.root,
+		C.xcb_visualid_t(visualid))
 
-    C.xcb_change_window_attributes_checked(
-        platform.xcb_connection,
-        window.xcb_window,
-        XCB_CW_COLORMAP,
-        (const uint32_t[]){ window.xcb_colormap });
+	attribs := []C.uint32_t{window.XcbColormap}
 
-    *pSurface = egl.eglCreatePlatformWindowSurface(dpy, config, &window.xcb_window, NULL);
-    if (*pSurface == EGL_NO_SURFACE) {
-        return WSI_ERROR_EGL;
-    }
+	C.xcb_change_window_attributes_checked(
+		platform.xcb_connection,
+		window.XcbWindow,
+		C.XCB_CW_COLORMAP,
+		unsafe.Pointer(&attribs[0]),
+	)
 
-    return WSI_SUCCESS;
+	*pSurface = egl.EglCreatePlatformWindowSurface(dpy, config, unsafe.Pointer(&window.XcbWindow), nil)
+	if *pSurface == egl.NilEGLSurface {
+		return WSI_ERROR_EGL
+	}
+
+	return WSI_SUCCESS
 }
 
-func WsiDestroyWindowEGLSurface(window WsiWindow, dpy egl.EGLDisplay, surface egl.EGLSurface) {
+func WsiDestroyWindowEGLSurface(window *WsiWindow, dpy egl.EGLDisplay, surface egl.EGLSurface) {
 
-    egl.eglDestroySurface(dpy, surface);
+	egl.EglDestroySurface(dpy, surface)
+	platform := window.Platform
 
-	value_list :=[]uint32_t{
-        platform.xcb_screen.default_colormap,
-    }
+	value_list := []C.uint32_t{
+		platform.xcb_screen.default_colormap,
+	}
 
-    xcb_change_window_attributes(
-        platform.xcb_connection,
-        window.xcb_window,
-        XCB_CW_COLORMAP,
-        value_list);
+	C.xcb_change_window_attributes(
+		platform.xcb_connection,
+		window.XcbWindow,
+		C.XCB_CW_COLORMAP,
+		unsafe.Pointer(&value_list[0]))
 
-    xcb_free_colormap(platform.xcb_connection, window.xcb_colormap)
-    window.xcb_colormap = XCB_NONE
+	C.xcb_free_colormap(platform.xcb_connection, window.XcbColormap)
+	window.XcbColormap = C.XCB_NONE
 }

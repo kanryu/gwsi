@@ -6,188 +6,176 @@ package libwsi
 #include <string.h>
 
 #include <xcb/xcb.h>
-
-#include "utils.h"
-
-#include "common_priv.h"
-#include "platform_priv.h"
-#include "window_priv.h"
 */
 import "C"
 
+type WsiWindow struct {
+	Platform    *WsiPlatform
+	XcbWindow   C.xcb_window_t
+	XcbParent   C.xcb_window_t
+	XcbColormap C.xcb_colormap_t
+	UserWidth   int
+	UserHeight  int
 
-type WsiWindow struct{
-     platform *WsiPlatform
-     link wsi_list
-     xcb_window xcb_window_t
-     xcb_parent xcb_window_t
-     xcb_colormap xcb_colormap_t
-     user_width uint16_t
-     user_height uint16_t
-
-    user_data uintptr
-    pfn_configure PFN_wsiConfigureWindow
-    pfn_close PFN_wsiCloseWindow
-};
+	UserData        uintptr
+	ConfigureWindow PFN_wsiConfigureWindow
+	CloseWindow     PFN_wsiCloseWindow
+}
 
 // region XCB Events
 
-func WsiWindow_xcb_configure_notify(    window WsiWindow,    event *xcb_configure_notify_event_t) {
-    assert(event.window == window.xcb_window);
+func wsi_window_xcb_configure_notify(window *WsiWindow, event *C.xcb_configure_notify_event_t) {
+	assert(event.window == window.xcb_window)
 
-    info := WsiConfigureWindowEvent{
-        base.type = WSI_EVENT_TYPE_CONFIGURE_WINDOW,
-        base.flags = 0,
-        base.serial = event.sequence,
-        window: window,
-        extent.width = event.width,
-        extent.height = event.height,
-    };
+	info := WsiConfigureWindowEvent{
+		Base: WsiEvent{
+			Type:   WSI_EVENT_TYPE_CONFIGURE_WINDOW,
+			Flags:  0,
+			Serial: event.sequence,
+		},
+		Window: window,
+		Extent: WsiExtent{
+			Width:  event.width,
+			Height: event.height,
+		},
+	}
 
-    window.pfn_configure(window.user_data, &info);
+	window.pfn_configure(window.user_data, &info)
 }
 
-func WsiWindow_xcb_client_message(    window *WsiWindow,    event *xcb_client_message_event_t){
-    assert(event.window == window.xcb_window);
+func wsi_window_xcb_client_message(window *WsiWindow, event *C.xcb_client_message_event_t) {
+	if event.Type == window.platform.xcb_atom_wm_protocols &&
+		event.data.data32[0] == window.platform.xcb_atom_wm_delete_window {
+		info := &WsiCloseWindowEvent{
+			Base: WsiEvent{
+				Type:   WSI_EVENT_TYPE_CLOSE_WINDOW,
+				Flags:  0,
+				Serial: event.sequence,
+				Time:   0,
+			},
+			Window: window,
+		}
 
-    if (event.type == window.platform.xcb_atom_wm_protocols &&
-        event.data.data32[0] == window.platform.xcb_atom_wm_delete_window)
-    {
-        WsiCloseWindowEvent info = {
-            .base.type = WSI_EVENT_TYPE_CLOSE_WINDOW,
-            .base.flags = 0,
-            .base.serial = event.sequence,
-            .base.time = 0,
-            .window = window,
-        };
-
-        window.pfn_close(window.user_data, &info);
-    }
+		window.pfn_close(window.user_data, info)
+	}
 }
 
 // endregion
 
+func (p *WsiPlatform) CreateWindow(pCreateInfo *WsiWindowCreateInfo, title string) (*WsiWindow, WsiResult) {
+	window := &WsiWindow{
+		Platform:        p,
+		XcbWindow:       xcb_generate_id(p.xcb_connection),
+		UserWidth:       wsi_xcb_clamp(pCreateInfo.extent.width),
+		UserHeight:      wsi_xcb_clamp(pCreateInfo.extent.height),
+		UserData:        pCreateInfo.pUserData,
+		ConfigureWindow: pCreateInfo.ConfigureWindow,
+		CloseWindow:     pCreateInfo.CloseWindow,
+	}
 
-func WsiCreateWindow(platform WsiPlatform, pCreateInfo *WsiWindowCreateInfo, pWindow *WsiWindow, title string) WsiResult {
-    struct WsiWindow *window = calloc(1, sizeof(struct WsiWindow));
-    if (!window) {
-        return WSI_ERROR_OUT_OF_MEMORY;
-    }
+	if pCreateInfo.parent != nil {
+		window.xcb_parent = pCreateInfo.parent.xcb_window
+	} else {
+		window.xcb_parent = p.xcb_screen.root
+	}
 
-    window.platform = platform;
-    window.xcb_window = xcb_generate_id(platform.xcb_connection);
-    window.user_width = wsi_xcb_clamp(pCreateInfo.extent.width);
-    window.user_height = wsi_xcb_clamp(pCreateInfo.extent.height);
-    window.user_data = pCreateInfo.pUserData;
-    window.pfn_configure = pCreateInfo.pfnConfigureWindow;
-    window.pfn_close = pCreateInfo.pfnCloseWindow;
+	value_mask := XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK
+	value_list := []C.uint32_t{
+		p.xcb_screen.black_pixel,
+		XCB_EVENT_MASK_EXPOSURE |
+			// XCB_EVENT_MASK_RESIZE_REDIRECT |
+			XCB_EVENT_MASK_STRUCTURE_NOTIFY |
+			XCB_EVENT_MASK_BUTTON_PRESS |
+			XCB_EVENT_MASK_BUTTON_RELEASE,
+	}
 
-    if (pCreateInfo.parent) {
-        window.xcb_parent = pCreateInfo.parent.xcb_window;
-    } else {
-        window.xcb_parent = platform.xcb_screen.root;
-    }
+	C.xcb_create_window_checked(
+		p.xcb_connection,
+		C.XCB_COPY_FROM_PARENT,
+		window.XcbWindow,
+		window.XcbParent,
+		0, 0,
+		window.UserWidth,
+		window.UserHeight,
+		10,
+		C.XCB_WINDOW_CLASS_INPUT_OUTPUT,
+		C.XCB_COPY_FROM_PARENT,
+		value_mask,
+		value_list)
 
-    uint32_t value_list[2];
-    uint32_t value_mask = XCB_CW_BACK_PIXEL | XCB_CW_EVENT_MASK ;
-    value_list[0] = platform.xcb_screen.black_pixel;
-    value_list[1] = XCB_EVENT_MASK_EXPOSURE
-               // | XCB_EVENT_MASK_RESIZE_REDIRECT
-                  | XCB_EVENT_MASK_STRUCTURE_NOTIFY
-                  | XCB_EVENT_MASK_BUTTON_PRESS
-                  | XCB_EVENT_MASK_BUTTON_RELEASE;
+	properties := []xcb_atom_t{
+		p.xcb_atom_wm_protocols,
+		p.xcb_atom_wm_delete_window,
+	}
 
-    xcb_create_window_checked(
-        platform.xcb_connection,
-        XCB_COPY_FROM_PARENT,
-        window.xcb_window,
-        window.xcb_parent,
-        0, 0,
-        window.user_width,
-        window.user_height,
-        10,
-        XCB_WINDOW_CLASS_INPUT_OUTPUT,
-        XCB_COPY_FROM_PARENT,
-        value_mask,
-        value_list);
+	C.xcb_change_property(
+		p.xcb_connection,
+		C.XCB_PROP_MODE_REPLACE,
+		window.xcb_window,
+		p.xcb_atom_wm_protocols,
+		C.XCB_ATOM_ATOM,
+		32,
+		wsi_array_length(properties),
+		properties)
 
-    xcb_atom_t properties[] = {
-        platform.xcb_atom_wm_protocols,
-        platform.xcb_atom_wm_delete_window,
-    };
+	C.xcb_map_window(p.xcb_connection, window.xcb_window)
+	C.xcb_flush(p.xcb_connection)
 
-    xcb_change_property(
-        platform.xcb_connection,
-        XCB_PROP_MODE_REPLACE,
-        window.xcb_window,
-        platform.xcb_atom_wm_protocols,
-        XCB_ATOM_ATOM,
-        32,
-        wsi_array_length(properties),
-        properties);
-
-    xcb_map_window(platform.xcb_connection, window.xcb_window);
-    xcb_flush(platform.xcb_connection);
-
-    wsi_list_insert(&platform.window_list, &window.link);
-    *pWindow = window;
-    return WSI_SUCCESS;
+	wsi_list_insert(&p.WindowList, &window.link)
+	return window, WSI_SUCCESS
 }
 
-func WsiDestroyWindow(window WsiWindow) {
-    struct wsi_platform *platform = window.platform;
+func WsiDestroyWindow(window *WsiWindow) {
+	platform := window.platform
 
-    xcb_unmap_window(platform.xcb_connection, window.xcb_window);
-    xcb_destroy_window(platform.xcb_connection, window.xcb_window);
-    xcb_flush(platform.xcb_connection);
-
-    free(window);
+	C.xcb_unmap_window(platform.xcb_connection, window.xcb_window)
+	C.xcb_destroy_window(platform.xcb_connection, window.xcb_window)
+	C.xcb_flush(platform.xcb_connection)
 }
 
-
-func wsiSetWindowParent(window WsiWindow, parent WsiWindow) WsiResult{
-    struct wsi_platform *platform = window.platform;
-    if (parent) {
-        window.xcb_parent = parent.xcb_window;
-    } else {
-        window.xcb_parent = platform.xcb_screen.root;
-    }
-    xcb_reparent_window(
-        platform.xcb_connection,
-        window.xcb_window,
-        parent.xcb_window,
-        0, 0);
-    return WSI_SUCCESS;
+func WsiSetWindowParent(window *WsiWindow, parent *WsiWindow) WsiResult {
+	platform := window.platform
+	if parent {
+		window.xcb_parent = parent.xcb_window
+	} else {
+		window.xcb_parent = platform.xcb_screen.root
+	}
+	C.xcb_reparent_window(
+		platform.xcb_connection,
+		window.xcb_window,
+		parent.xcb_window,
+		0, 0)
+	return WSI_SUCCESS
 }
 
+func wsiSetWindowTitle(window WsiWindow, pTitle string) WsiResult {
+	if pTitle != "" {
+		C.xcb_change_property(
+			window.Platform.xcb_connection,
+			C.XCB_PROP_MODE_REPLACE,
+			window.XcbWindow,
+			C.XCB_ATOM_WM_NAME,
+			C.XCB_ATOM_STRING,
+			8,
+			len(pTitle),
+			C.CString(pTitle),
+		)
+	} else {
+		C.xcb_delete_property(
+			window.Platform.xcb_connection,
+			window.XcbWindow,
+			C.XCB_ATOM_WM_NAME)
+	}
 
-func wsiSetWindowTitle(window WsiWindow, pTitle string) WsiResult{
-    if (pTitle) {
-        xcb_change_property(
-            window.platform.xcb_connection,
-            XCB_PROP_MODE_REPLACE,
-            window.xcb_window,
-            XCB_ATOM_WM_NAME,
-            XCB_ATOM_STRING,
-            8,
-            strlen(pTitle),
-            pTitle);
-    } else {
-        xcb_delete_property(
-           window.platform.xcb_connection,
-           window.xcb_window,
-           XCB_ATOM_WM_NAME);
-    }
-
-    return WSI_SUCCESS;
+	return WSI_SUCCESS
 }
 
-func wsi_xcb_clamp(int32_t value) uint16_t{
-    if (value < 0) {
-        return 0;
-    }
-    if (value > UINT16_MAX) {
-        return UINT16_MAX;
-    }
-    return (uint16_t)value;
+func wsi_xcb_clamp(value uint32) uint16 {
+	if value < 0 {
+		return 0
+	}
+	if value > C.UINT16_MAX {
+		return uint16(C.UINT16_MAX)
+	}
+	return uint16(value)
 }

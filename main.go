@@ -18,8 +18,8 @@ const (
 )
 
 var (
-	g_platform  libwsi.WsiPlatform
-	g_window    libwsi.WsiWindow
+	g_platform  *libwsi.WsiPlatform
+	g_window    *libwsi.WsiWindow
 	g_extent    libwsi.WsiExtent
 	g_running   bool = true
 	g_resized   bool = false
@@ -272,12 +272,13 @@ func main() {
 	var major, minor egl.EGLint
 	var ok bool
 	last_time := linux.GetTimeNs()
-
-	platform_info := libwsi.NewWsiPlatformCreateInfo(libwsi.WSI_STRUCTURE_TYPE_PLATFORM_CREATE_INFO)
-	res := libwsi.WsiCreatePlatform(&platform_info, &g_platform)
-	if res != libwsi.WSI_SUCCESS {
-		fmt.Printf("wsiCreatePlatform failed: %d\n", res)
-		goto err_wsi_platform
+	platform_info := libwsi.WsiPlatformCreateInfo{
+		Type: libwsi.WSI_STRUCTURE_TYPE_PLATFORM_CREATE_INFO,
+	}
+	if platform, err := libwsi.WsiCreatePlatform(&platform_info); err != nil {
+		panic(err)
+	} else {
+		g_platform = platform
 	}
 
 	res = libwsi.WsiGetEGLDisplay(g_platform, &g_display)
@@ -329,11 +330,12 @@ func main() {
 		goto err_egl_context
 	}
 
-	info = libwsi.NewWsiWindowCreateInfo(
-		libwsi.WSI_STRUCTURE_TYPE_WINDOW_CREATE_INFO,
-		libwsi.WsiExtent{Width: 300, Height: 300},
-	)
-	libwsi.RegisterWindowCallbacks(&info, configure_window, close_window)
+	info = libwsi.WsiWindowCreateInfo{
+		Type:            libwsi.WSI_STRUCTURE_TYPE_WINDOW_CREATE_INFO,
+		Extent:          libwsi.WsiExtent{Width: 300, Height: 300},
+		ConfigureWindow: configure_window,
+		CloseWindow:     close_window,
+	}
 
 	res = libwsi.WsiCreateWindow(g_platform, &info, &g_window, "gears")
 	if res != libwsi.WSI_SUCCESS {

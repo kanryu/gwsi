@@ -14,10 +14,12 @@ package egl
 #cgo openbsd LDFLAGS: -L/usr/X11R6/lib
 #cgo CFLAGS: -DEGL_NO_X11
 
+#include <xcb/xcb.h>
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 */
 import "C"
+import "unsafe"
 
 type (
 	EGLenum           = C.EGLenum
@@ -26,6 +28,7 @@ type (
 	EGLConfig         = C.EGLConfig
 	EGLContext        = C.EGLContext
 	EGLSurface        = C.EGLSurface
+	XCBAttrib         = C.long
 	NativeDisplayType = C.EGLNativeDisplayType
 	NativeWindowType  = C.EGLNativeWindowType
 )
@@ -130,6 +133,16 @@ func EglGetDisplay(disp NativeDisplayType) EGLDisplay {
 
 func EglCreateWindowSurface(disp EGLDisplay, conf EGLConfig, win NativeWindowType, attribs []EGLint) EGLSurface {
 	eglSurf := C.eglCreateWindowSurface(disp, conf, win, &attribs[0])
+	return eglSurf
+}
+
+func EglGetPlatformDisplay(att uint32, conn unsafe.Pointer, attribs []XCBAttrib) EGLDisplay {
+	eglSurf := C.eglGetPlatformDisplay(C.uint(att), conn, &attribs[0])
+	return eglSurf
+}
+
+func EglCreatePlatformWindowSurface(disp EGLDisplay, conf EGLConfig, win unsafe.Pointer, attribs *XCBAttrib) EGLSurface {
+	eglSurf := C.eglCreatePlatformWindowSurface(disp, conf, win, attribs)
 	return eglSurf
 }
 
