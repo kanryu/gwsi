@@ -13,20 +13,20 @@ type WsiWindowCreateInfo struct {
 	Extent          WsiExtent
 	Next            uintptr
 	Title           string
-	UserData        uintptr
+	UserData        unsafe.Pointer
 	ConfigureWindow PFN_wsiConfigureWindow
 	CloseWindow     PFN_wsiCloseWindow
 }
 
 type WsiConfigureWindowEvent struct {
 	Base   WsiEvent
-	Window WsiWindow
+	Window *WsiWindow
 	Extent WsiExtent
 }
 
 type WsiCloseWindowEvent struct {
 	Base   WsiEvent
-	Window WsiWindow
+	Window *WsiWindow
 }
 
 type PFN_wsiConfigureWindow func(pUserData unsafe.Pointer, pConfig *WsiConfigureWindowEvent)

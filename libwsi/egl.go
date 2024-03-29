@@ -6,6 +6,7 @@ import (
 )
 
 /*
+#cgo linux,!android pkg-config: xcb
 #include <assert.h>
 
 #include <xcb/xcb.h>
@@ -59,7 +60,7 @@ func WsiCreateWindowEGLSurface(window *WsiWindow, dpy egl.EGLDisplay, config egl
 		unsafe.Pointer(&attribs[0]),
 	)
 
-	*pSurface = egl.EglCreatePlatformWindowSurface(dpy, config, unsafe.Pointer(&window.XcbWindow), nil)
+	*pSurface = egl.EglCreatePlatformWindowSurface(dpy, config, egl.PtrXcbWindow(&window.XcbWindow), nil)
 	if *pSurface == egl.NilEGLSurface {
 		return WSI_ERROR_EGL
 	}

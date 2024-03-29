@@ -17,9 +17,16 @@ package egl
 #include <xcb/xcb.h>
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
+
+EGLSurface libwsi_eglCreatePlatformWindowSurface(EGLDisplay disp, EGLConfig conf, xcb_window_t* win, long* attrib)
+{
+	return eglCreatePlatformWindowSurface(disp, conf, win, attrib);
+}
 */
 import "C"
-import "unsafe"
+import (
+	"unsafe"
+)
 
 type (
 	EGLenum           = C.EGLenum
@@ -29,6 +36,7 @@ type (
 	EGLContext        = C.EGLContext
 	EGLSurface        = C.EGLSurface
 	XCBAttrib         = C.long
+	PtrXcbWindow      = *C.xcb_window_t
 	NativeDisplayType = C.EGLNativeDisplayType
 	NativeWindowType  = C.EGLNativeWindowType
 )
@@ -141,8 +149,12 @@ func EglGetPlatformDisplay(att uint32, conn unsafe.Pointer, attribs []XCBAttrib)
 	return eglSurf
 }
 
-func EglCreatePlatformWindowSurface(disp EGLDisplay, conf EGLConfig, win unsafe.Pointer, attribs *XCBAttrib) EGLSurface {
-	eglSurf := C.eglCreatePlatformWindowSurface(disp, conf, win, attribs)
+func EglCreatePlatformWindowSurface(disp EGLDisplay, conf EGLConfig, win *C.xcb_window_t, attribs *XCBAttrib) EGLSurface {
+	// p := runtime.Pinner{}
+	// p.Pin(win)
+	// defer p.Unpin()
+
+	eglSurf := C.libwsi_eglCreatePlatformWindowSurface(disp, conf, win, nil)
 	return eglSurf
 }
 

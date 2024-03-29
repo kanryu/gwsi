@@ -281,7 +281,7 @@ func main() {
 		g_platform = platform
 	}
 
-	res = libwsi.WsiGetEGLDisplay(g_platform, &g_display)
+	res := libwsi.WsiGetEGLDisplay(g_platform, &g_display)
 	if res != libwsi.WSI_SUCCESS {
 		fmt.Printf("wsiGetEGLDisplay failed: %d", res)
 		if res == libwsi.WSI_ERROR_EGL {
@@ -337,14 +337,14 @@ func main() {
 		CloseWindow:     close_window,
 	}
 
-	res = libwsi.WsiCreateWindow(g_platform, &info, &g_window, "gears")
+	g_window, res = g_platform.CreateWindow(&info, "gears")
 	if res != libwsi.WSI_SUCCESS {
 		fmt.Printf("wsiCreateWindow failed: %d\n", res)
 		goto err_wsi_window
 	}
 
 	for {
-		res = libwsi.WsiDispatchEvents(g_platform, -1)
+		res = g_platform.DispatchEvents(-1)
 		if res != libwsi.WSI_SUCCESS || g_resized {
 			break
 		}
@@ -374,6 +374,7 @@ func main() {
 		fmt.Printf("eglSwapInterval failed: 0x%08x\n", egl.EglGetError())
 		goto err_egl_interval
 	}
+	gl.Init()
 
 	create_gears()
 
@@ -396,7 +397,7 @@ func main() {
 		g_angle += time * 70.0
 		g_angle = math.Mod(float64(g_angle), 360.0)
 
-		res = libwsi.WsiDispatchEvents(g_platform, 0)
+		res = g_platform.DispatchEvents(0)
 		if res != libwsi.WSI_SUCCESS || !g_running {
 			break
 		}
@@ -417,6 +418,5 @@ err_egl_version:
 	egl.EglTerminate(g_display)
 err_egl_init:
 err_wsi_display:
-	libwsi.WsiDestroyPlatform(g_platform)
-err_wsi_platform:
+	g_platform.Destroy()
 }

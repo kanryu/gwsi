@@ -48,9 +48,11 @@ func (p *WsiPlatform) QueryExtension(name string) bool {
 }
 
 func (p *WsiPlatform) InitAtoms() {
-	mapAtoms["WM_PROTOCOLS"] = &p.xcb_atom_wm_protocols
-	mapAtoms["WM_DELETE_WINDOW"] = &p.xcb_atom_wm_delete_window
 
+	mapAtoms = map[string]*C.xcb_atom_t{
+		"WM_PROTOCOLS":     &p.xcb_atom_wm_protocols,
+		"WM_DELETE_WINDOW": &p.xcb_atom_wm_delete_window,
+	}
 	for name, atom := range mapAtoms {
 		cookie := C.xcb_intern_atom(
 			p.xcb_connection, 0, C.ushort(len(name)), C.CString(name))
@@ -110,8 +112,8 @@ func WsiCreatePlatform(pCreateInfo *WsiPlatformCreateInfo) (*WsiPlatform, error)
 
 	setup := C.xcb_get_setup(platform.xcb_connection)
 
-	platform.xcb_screen = wsi_xcb_get_screen(setup, platform.xcb_screen_id)
-	if !platform.xcb_screen {
+	platform.xcb_screen = wsi_xcb_get_screen(setup, int(platform.xcb_screen_id))
+	if platform.xcb_screen == nil {
 		return nil, fmt.Errorf("xcb_get_screen failed")
 	}
 
@@ -134,21 +136,21 @@ func (p *WsiPlatform) Destroy() {
 
 func (p *WsiPlatform) DispatchEvents(timeout int64) WsiResult {
 	for {
-		event := C.xcb_poll_for_event(platform.xcb_connection)
+		event := C.xcb_poll_for_event(p.xcb_connection)
 		if event == nil {
 			break
 		}
 
-		switch event.response_type & ~0x80 {
+		switch event.response_type & 0x7f {
 		case C.XCB_CONFIGURE_NOTIFY:
-			notify := (*C.xcb_configure_notify_event_t)(event)
+			notify := (*C.xcb_configure_notify_event_t)(unsafe.Pointer(event))
 			window := p.FindWindow(notify.window)
 			if window != nil {
 				wsi_window_xcb_configure_notify(window, notify)
 			}
 			break
 		case C.XCB_CLIENT_MESSAGE:
-			message := (*C.xcb_client_message_event_t)(event)
+			message := (*C.xcb_client_message_event_t)(unsafe.Pointer(event))
 
 			window := p.FindWindow(message.window)
 			if window != nil {
@@ -157,7 +159,7 @@ func (p *WsiPlatform) DispatchEvents(timeout int64) WsiResult {
 			break
 		}
 
-		C.free(event)
+		C.free(unsafe.Pointer(event))
 	}
 
 	return WSI_SUCCESS
