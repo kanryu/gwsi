@@ -14,14 +14,8 @@ package egl
 #cgo openbsd LDFLAGS: -L/usr/X11R6/lib
 #cgo CFLAGS: -DEGL_NO_X11
 
-#include <xcb/xcb.h>
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
-
-EGLSurface libwsi_eglCreatePlatformWindowSurface(EGLDisplay disp, EGLConfig conf, xcb_window_t* win, long* attrib)
-{
-	return eglCreatePlatformWindowSurface(disp, conf, win, attrib);
-}
 */
 import "C"
 import (
