@@ -6,7 +6,6 @@ import (
 )
 
 /*
-#cgo linux,!android pkg-config: xcb
 #include <assert.h>
 
 #include <xcb/xcb.h>

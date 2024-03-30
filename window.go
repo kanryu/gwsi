@@ -1,14 +1,30 @@
 package gwsi
 
 /*
+#cgo linux,!android pkg-config: xcb
+#cgo linux,!android pkg-config: xcb-imdkit
+#include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
 
 #include <xcb/xcb.h>
+#include <xcb/xcb_keysyms.h>
+#include <xcb-imdkit/encoding.h>
+#include <xcb-imdkit/encoding.h>
+#include <xcb-imdkit/ximproto.h>
+#include <xcb-imdkit/imclient.h>
+extern xcb_window_t xcb_window;
+extern void create_ic_callback(xcb_xim_t *im, xcb_xic_t new_ic, void *user_data);
+extern void open_callback(xcb_xim_t *im, void *user_data);
+extern bool gwsi_xcb_xim_open(xcb_xim_t *im,
+	bool auto_connect, void *user_data);
 */
 import "C"
-import "unsafe"
+import (
+	"fmt"
+	"unsafe"
+)
 
 type WsiWindow struct {
 	Platform    *WsiPlatform
@@ -61,6 +77,13 @@ func wsi_window_xcb_client_message(window *WsiWindow, event *C.xcb_client_messag
 	}
 }
 
+//export wsiSetXicCallback
+func wsiSetXicCallback(new_ic C.xcb_xic_t, userData unsafe.Pointer) {
+	fmt.Println("wsi_set_xic_callback")
+	p := (*WsiPlatform)(userData)
+	p.xcb_xic = new_ic
+}
+
 // endregion
 
 func (p *WsiPlatform) CreateWindow(pCreateInfo *WsiWindowCreateInfo, title string) (*WsiWindow, WsiResult) {
@@ -73,6 +96,7 @@ func (p *WsiPlatform) CreateWindow(pCreateInfo *WsiWindowCreateInfo, title strin
 		ConfigureWindow: pCreateInfo.ConfigureWindow,
 		CloseWindow:     pCreateInfo.CloseWindow,
 	}
+	C.xcb_window = window.XcbWindow
 
 	if pCreateInfo.Parent != nil {
 		window.XcbParent = pCreateInfo.Parent.XcbWindow
@@ -86,6 +110,11 @@ func (p *WsiPlatform) CreateWindow(pCreateInfo *WsiWindowCreateInfo, title strin
 		C.XCB_EVENT_MASK_EXPOSURE |
 			// XCB_EVENT_MASK_RESIZE_REDIRECT |
 			C.XCB_EVENT_MASK_STRUCTURE_NOTIFY |
+			C.XCB_EVENT_MASK_KEY_PRESS |
+			C.XCB_EVENT_MASK_KEY_RELEASE |
+			C.XCB_EVENT_MASK_KEYMAP_STATE |
+			C.XCB_EVENT_MASK_FOCUS_CHANGE |
+			C.XCB_EVENT_MASK_PROPERTY_CHANGE |
 			C.XCB_EVENT_MASK_BUTTON_PRESS |
 			C.XCB_EVENT_MASK_BUTTON_RELEASE,
 	}
@@ -123,6 +152,9 @@ func (p *WsiPlatform) CreateWindow(pCreateInfo *WsiWindowCreateInfo, title strin
 
 	C.xcb_map_window(p.xcb_connection, window.XcbWindow)
 	C.xcb_flush(p.xcb_connection)
+
+	// Open connection to XIM server.
+	C.gwsi_xcb_xim_open(p.xcb_im, true, unsafe.Pointer(p))
 
 	p.WindowList = append(p.WindowList, window)
 	return window, WSI_SUCCESS
