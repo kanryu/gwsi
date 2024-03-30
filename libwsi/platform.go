@@ -148,7 +148,6 @@ func (p *WsiPlatform) DispatchEvents(timeout int64) WsiResult {
 			if window != nil {
 				wsi_window_xcb_configure_notify(window, notify)
 			}
-			break
 		case C.XCB_CLIENT_MESSAGE:
 			message := (*C.xcb_client_message_event_t)(unsafe.Pointer(event))
 
@@ -156,7 +155,6 @@ func (p *WsiPlatform) DispatchEvents(timeout int64) WsiResult {
 			if window != nil {
 				wsi_window_xcb_client_message(window, message)
 			}
-			break
 		}
 
 		C.free(unsafe.Pointer(event))
