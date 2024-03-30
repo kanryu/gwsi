@@ -1,4 +1,4 @@
-# gowsi
+# gwsi
 
 This is an experimental implementation of [libwsi](markbolhuis/libwsi) ported to the Go language.
 
