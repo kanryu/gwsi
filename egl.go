@@ -1,7 +1,7 @@
-package libwsi
+package gwsi
 
 import (
-	"libwsi_test/egl"
+	"gwsi/egl"
 	"unsafe"
 )
 

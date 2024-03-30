@@ -1,4 +1,4 @@
-module libwsi_test
+module gwsi
 
 go 1.22.1
 

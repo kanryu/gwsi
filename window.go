@@ -1,4 +1,4 @@
-package libwsi
+package gwsi
 
 /*
 #include <stdlib.h>

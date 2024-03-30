@@ -8,9 +8,9 @@ import (
 
 	"github.com/go-gl/gl/v2.1/gl"
 
-	"libwsi_test/egl"
-	"libwsi_test/libwsi"
-	"libwsi_test/linux"
+	"gwsi"
+	"gwsi/egl"
+	"gwsi/linux"
 )
 
 const (
@@ -18,9 +18,9 @@ const (
 )
 
 var (
-	g_platform  *libwsi.WsiPlatform
-	g_window    *libwsi.WsiWindow
-	g_extent    libwsi.WsiExtent
+	g_platform  *gwsi.WsiPlatform
+	g_window    *gwsi.WsiWindow
+	g_extent    gwsi.WsiExtent
 	g_running   bool = true
 	g_resized   bool = false
 	g_display   egl.EGLDisplay
@@ -257,35 +257,35 @@ func create_gears() {
 	gl.Enable(gl.NORMALIZE)
 }
 
-func configure_window(pUserData unsafe.Pointer, pConfig *libwsi.WsiConfigureWindowEvent) {
-	g_extent = libwsi.WsiExtent(pConfig.Extent)
+func configure_window(pUserData unsafe.Pointer, pConfig *gwsi.WsiConfigureWindowEvent) {
+	g_extent = gwsi.WsiExtent(pConfig.Extent)
 	g_resized = true
 }
 
-func close_window(pUserData unsafe.Pointer, pInfo *libwsi.WsiCloseWindowEvent) {
+func close_window(pUserData unsafe.Pointer, pInfo *gwsi.WsiCloseWindowEvent) {
 	g_running = false
 }
 
 func main() {
-	var info libwsi.WsiWindowCreateInfo
+	var info gwsi.WsiWindowCreateInfo
 	var num_configs egl.EGLint
 	var major, minor egl.EGLint
 	var ok bool
 	last_time := linux.GetTimeNs()
-	libwsi.WsiEglInit()
-	platform_info := libwsi.WsiPlatformCreateInfo{
-		Type: libwsi.WSI_STRUCTURE_TYPE_PLATFORM_CREATE_INFO,
+	gwsi.WsiEglInit()
+	platform_info := gwsi.WsiPlatformCreateInfo{
+		Type: gwsi.WSI_STRUCTURE_TYPE_PLATFORM_CREATE_INFO,
 	}
-	if platform, err := libwsi.WsiCreatePlatform(&platform_info); err != nil {
+	if platform, err := gwsi.WsiCreatePlatform(&platform_info); err != nil {
 		panic(err)
 	} else {
 		g_platform = platform
 	}
 
-	res := libwsi.WsiGetEGLDisplay(g_platform, &g_display)
-	if res != libwsi.WSI_SUCCESS {
+	res := gwsi.WsiGetEGLDisplay(g_platform, &g_display)
+	if res != gwsi.WSI_SUCCESS {
 		fmt.Printf("wsiGetEGLDisplay failed: %d", res)
-		if res == libwsi.WSI_ERROR_EGL {
+		if res == gwsi.WSI_ERROR_EGL {
 			fmt.Printf(" 0x%08x", egl.EglGetError())
 		}
 		fmt.Printf("\n")
@@ -331,33 +331,33 @@ func main() {
 		goto err_egl_context
 	}
 
-	info = libwsi.WsiWindowCreateInfo{
-		Type:            libwsi.WSI_STRUCTURE_TYPE_WINDOW_CREATE_INFO,
-		Extent:          libwsi.WsiExtent{Width: 300, Height: 300},
+	info = gwsi.WsiWindowCreateInfo{
+		Type:            gwsi.WSI_STRUCTURE_TYPE_WINDOW_CREATE_INFO,
+		Extent:          gwsi.WsiExtent{Width: 300, Height: 300},
 		ConfigureWindow: configure_window,
 		CloseWindow:     close_window,
 	}
 
 	g_window, res = g_platform.CreateWindow(&info, "gears")
-	if res != libwsi.WSI_SUCCESS {
+	if res != gwsi.WSI_SUCCESS {
 		fmt.Printf("wsiCreateWindow failed: %d\n", res)
 		goto err_wsi_window
 	}
 
 	for {
 		res = g_platform.DispatchEvents(-1)
-		if res != libwsi.WSI_SUCCESS || g_resized {
+		if res != gwsi.WSI_SUCCESS || g_resized {
 			break
 		}
 	}
-	if res != libwsi.WSI_SUCCESS {
+	if res != gwsi.WSI_SUCCESS {
 		goto err_wsi_dispatch
 	}
 
-	res = libwsi.WsiCreateWindowEGLSurface(g_window, g_display, g_config, &g_surface)
-	if res != libwsi.WSI_SUCCESS {
+	res = gwsi.WsiCreateWindowEGLSurface(g_window, g_display, g_config, &g_surface)
+	if res != gwsi.WSI_SUCCESS {
 		fmt.Printf("wsiCreateWindowEGLSurface failed: %d", res)
-		if res == libwsi.WSI_ERROR_EGL {
+		if res == gwsi.WSI_ERROR_EGL {
 			fmt.Printf(" 0x%08x", egl.EglGetError())
 		}
 		fmt.Printf("\n")
@@ -399,17 +399,17 @@ func main() {
 		g_angle = math.Mod(float64(g_angle), 360.0)
 
 		res = g_platform.DispatchEvents(0)
-		if res != libwsi.WSI_SUCCESS || !g_running {
+		if res != gwsi.WSI_SUCCESS || !g_running {
 			break
 		}
 	}
 
 err_egl_interval:
 err_egl_current:
-	libwsi.WsiDestroyWindowEGLSurface(g_window, g_display, g_surface)
+	gwsi.WsiDestroyWindowEGLSurface(g_window, g_display, g_surface)
 err_wsi_surface:
 err_wsi_dispatch:
-	libwsi.WsiDestroyWindow(g_window)
+	gwsi.WsiDestroyWindow(g_window)
 err_wsi_window:
 	egl.EglDestroyContext(g_display, g_context)
 err_egl_context:
