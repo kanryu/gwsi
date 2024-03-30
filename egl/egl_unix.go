@@ -25,7 +25,11 @@ EGLSurface libwsi_eglCreatePlatformWindowSurface(EGLDisplay disp, EGLConfig conf
 */
 import "C"
 import (
+	"fmt"
+	"runtime"
 	"unsafe"
+
+	"github.com/ebitengine/purego"
 )
 
 type (
@@ -35,18 +39,45 @@ type (
 	EGLConfig         = C.EGLConfig
 	EGLContext        = C.EGLContext
 	EGLSurface        = C.EGLSurface
-	XCBAttrib         = C.long
-	PtrXcbWindow      = *C.xcb_window_t
+	EGLAttrib         = C.long
+	PtrXcbWindow      = unsafe.Pointer
 	NativeDisplayType = C.EGLNativeDisplayType
 	NativeWindowType  = C.EGLNativeWindowType
 )
 
+var (
+	_eglBindAPI                    func(api EGLenum) EGLenum
+	EglGetPlatformDisplay          func(att uint32, conn unsafe.Pointer, attribs []EGLAttrib) EGLDisplay
+	EglCreatePlatformWindowSurface func(disp EGLDisplay, conf EGLConfig, win PtrXcbWindow, attribs *EGLAttrib) EGLSurface
+)
+
 func LoadEGL() error {
+	lib, err := purego.Dlopen(getLibEGL(), purego.RTLD_NOW|purego.RTLD_GLOBAL)
+	if err != nil {
+		panic(err)
+	}
+	// var puts func(string)
+	// purego.RegisterLibFunc(&puts, lib, "puts")
+	// puts("Calling C from Go without Cgo!")
+	purego.RegisterLibFunc(&_eglBindAPI, lib, "eglBindAPI")
+	purego.RegisterLibFunc(&EglGetPlatformDisplay, lib, "eglGetPlatformDisplay")
+	purego.RegisterLibFunc(&EglCreatePlatformWindowSurface, lib, "eglCreatePlatformWindowSurface")
 	return nil
 }
 
+func getLibEGL() string {
+	switch runtime.GOOS {
+	case "darwin":
+		return "/usr/lib/libSystem.B.dylib"
+	case "linux":
+		return "libEGL.so"
+	default:
+		panic(fmt.Errorf("GOOS=%s is not supported", runtime.GOOS))
+	}
+}
+
 func EglBindAPI(api uint) bool {
-	if C.eglBindAPI(EGLenum(api)) != C.EGL_TRUE {
+	if ret := _eglBindAPI(EGLenum(api)); ret != C.EGL_TRUE {
 		return false
 	}
 	return true
@@ -144,19 +175,15 @@ func EglCreateWindowSurface(disp EGLDisplay, conf EGLConfig, win NativeWindowTyp
 	return eglSurf
 }
 
-func EglGetPlatformDisplay(att uint32, conn unsafe.Pointer, attribs []XCBAttrib) EGLDisplay {
-	eglSurf := C.eglGetPlatformDisplay(C.uint(att), conn, &attribs[0])
-	return eglSurf
-}
+// func EglGetPlatformDisplay(att uint32, conn unsafe.Pointer, attribs []EGLAttrib) EGLDisplay {
+// 	eglSurf := C.eglGetPlatformDisplay(C.uint(att), conn, &attribs[0])
+// 	return eglSurf
+// }
 
-func EglCreatePlatformWindowSurface(disp EGLDisplay, conf EGLConfig, win *C.xcb_window_t, attribs *XCBAttrib) EGLSurface {
-	// p := runtime.Pinner{}
-	// p.Pin(win)
-	// defer p.Unpin()
-
-	eglSurf := C.libwsi_eglCreatePlatformWindowSurface(disp, conf, win, nil)
-	return eglSurf
-}
+// func EglCreatePlatformWindowSurface(disp EGLDisplay, conf EGLConfig, win PtrXcbWindow, attribs *XCBAttrib) EGLSurface {
+// 	eglSurf := C.libwsi_eglCreatePlatformWindowSurface(disp, conf, win, nil)
+// 	return eglSurf
+// }
 
 func EglWaitClient() bool {
 	return C.eglWaitClient() == C.EGL_TRUE

@@ -16,9 +16,13 @@ import (
 */
 import "C"
 
+func WsiEglInit() {
+	egl.LoadEGL()
+}
+
 func WsiGetEGLDisplay(platform *WsiPlatform, pDisplay *egl.EGLDisplay) WsiResult {
-	attrib := []egl.XCBAttrib{
-		egl.EGL_PLATFORM_XCB_SCREEN_EXT, egl.XCBAttrib(platform.xcb_screen_id),
+	attrib := []egl.EGLAttrib{
+		egl.EGL_PLATFORM_XCB_SCREEN_EXT, egl.EGLAttrib(platform.xcb_screen_id),
 		egl.EGL_NONE,
 	}
 

@@ -272,6 +272,7 @@ func main() {
 	var major, minor egl.EGLint
 	var ok bool
 	last_time := linux.GetTimeNs()
+	libwsi.WsiEglInit()
 	platform_info := libwsi.WsiPlatformCreateInfo{
 		Type: libwsi.WSI_STRUCTURE_TYPE_PLATFORM_CREATE_INFO,
 	}

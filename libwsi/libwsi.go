@@ -11,7 +11,6 @@ type WsiWindowCreateInfo struct {
 	Type            WsiStructureType
 	Parent          *WsiWindow
 	Extent          WsiExtent
-	Next            uintptr
 	Title           string
 	UserData        unsafe.Pointer
 	ConfigureWindow PFN_wsiConfigureWindow
