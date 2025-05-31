@@ -5,19 +5,6 @@
 
 package egl
 
-/*
-#cgo linux,!android  pkg-config: egl
-#cgo freebsd openbsd android LDFLAGS: -lEGL
-#cgo freebsd CFLAGS: -I/usr/local/include
-#cgo freebsd LDFLAGS: -L/usr/local/lib
-#cgo openbsd CFLAGS: -I/usr/X11R6/include
-#cgo openbsd LDFLAGS: -L/usr/X11R6/lib
-#cgo CFLAGS: -DEGL_NO_X11
-
-#include <EGL/egl.h>
-#include <EGL/eglext.h>
-*/
-import "C"
 import (
 	"fmt"
 	"runtime"
@@ -27,20 +14,57 @@ import (
 )
 
 type (
-	EGLenum           = C.EGLenum
-	EGLint            = C.EGLint
-	EGLDisplay        = C.EGLDisplay
-	EGLConfig         = C.EGLConfig
-	EGLContext        = C.EGLContext
-	EGLSurface        = C.EGLSurface
-	EGLAttrib         = C.long
-	PtrXcbWindow      = unsafe.Pointer
-	NativeDisplayType = C.EGLNativeDisplayType
-	NativeWindowType  = C.EGLNativeWindowType
+	EGLBoolean           = uint32
+	EGLenum              = uint32
+	EGLint               = int32
+	EGLDisplay           = uintptr
+	EGLConfig            = uintptr
+	EGLContext           = uintptr
+	EGLSurface           = uintptr
+	EGLAttrib            = uintptr
+	EGLClientBuffer      = uintptr
+	PtrXcbWindow         = unsafe.Pointer
+	EGLNativePixmapType  = uintptr
+	EGLNativeDisplayType = uintptr
+	EGLNativeWindowType  = uintptr
 )
 
 var (
-	_eglBindAPI                    func(api EGLenum) EGLenum
+	_eglBindAPI              func(api EGLenum) EGLenum
+	_eglGetConfigs           func(dpy EGLDisplay, configs *EGLConfig, config_size EGLint, num_config *EGLint) EGLBoolean
+	_eglChooseConfig         func(dpy EGLDisplay, attrib_list *EGLint, configs *EGLConfig, config_size EGLint, num_config *EGLint) EGLBoolean
+	_eglCreateContext        func(dpy EGLDisplay, config EGLConfig, share_context EGLContext, attrib_list *EGLint) EGLContext
+	_eglCreatePbufferSurface func(dpy EGLDisplay, config EGLConfig, attrib_list *EGLint) EGLSurface
+	_eglCreatePixmapSurface  func(dpy EGLDisplay, config EGLConfig, pixmap EGLNativePixmapType, attrib_list *EGLint) EGLSurface
+	_eglCreateWindowSurface  func(dpy EGLDisplay, config EGLConfig, win EGLNativeWindowType, attrib_list *EGLint) EGLSurface
+	_eglDestroyContext       func(dpy EGLDisplay, ctx EGLContext) EGLBoolean
+	_eglDestroySurface       func(dpy EGLDisplay, surface EGLSurface) EGLBoolean
+	_eglGetConfigAttrib      func(dpy EGLDisplay, config EGLConfig, attribute EGLint, value *EGLint) EGLBoolean
+	_eglGetCurrentSurface    func(readdraw EGLint) EGLSurface
+	_eglGetDisplay           func(display_id EGLNativeDisplayType) EGLDisplay
+	_eglInitialize           func(dpy EGLDisplay, major *EGLint, minor *EGLint) EGLBoolean
+	_eglMakeCurrent          func(dpy EGLDisplay, draw EGLSurface, read EGLSurface, ctx EGLContext) EGLBoolean
+	_eglQueryContext         func(dpy EGLDisplay, ctx EGLContext, attribute EGLint, value *EGLint) EGLBoolean
+	_eglQueryString          func(dpy EGLDisplay, name EGLint) string
+	_eglQuerySurface         func(dpy EGLDisplay, surface EGLSurface, attribute EGLint, value *EGLint) EGLBoolean
+	_eglSwapBuffers          func(dpy EGLDisplay, surface EGLSurface) EGLBoolean
+	_eglTerminate            func(dpy EGLDisplay) EGLBoolean
+	_eglWaitNative           func(engine EGLint) EGLBoolean
+	_eglGetCurrentDisplay    func() EGLDisplay
+	_eglGetProcAddress       func(procname string) uintptr
+	_eglGetError             func() EGLint
+	_eglWaitGL               func() EGLBoolean
+
+	_eglQueryAPI                      func() EGLenum
+	_eglCreatePbufferFromClientBuffer func(dpy EGLDisplay, buftype EGLenum, buffer EGLClientBuffer, config EGLConfig, attrib_list *EGLint) EGLSurface
+	_eglReleaseThread                 func() EGLBoolean
+	_eglWaitClient                    func() EGLBoolean
+
+	_eglBindTexImage    func(dpy EGLDisplay, surface EGLSurface, buffer EGLint) EGLBoolean
+	_eglReleaseTexImage func(dpy EGLDisplay, surface EGLSurface, buffer EGLint) EGLBoolean
+	_eglSurfaceAttrib   func(dpy EGLDisplay, surface EGLSurface, attribute EGLint, value EGLint) EGLBoolean
+	_eglSwapInterval    func(dpy EGLDisplay, interval EGLint) EGLBoolean
+
 	EglGetPlatformDisplay          func(att uint32, conn unsafe.Pointer, attribs []EGLAttrib) EGLDisplay
 	EglCreatePlatformWindowSurface func(disp EGLDisplay, conf EGLConfig, win PtrXcbWindow, attribs *EGLAttrib) EGLSurface
 )
@@ -50,10 +74,39 @@ func LoadEGL() error {
 	if err != nil {
 		panic(err)
 	}
-	// var puts func(string)
-	// purego.RegisterLibFunc(&puts, lib, "puts")
-	// puts("Calling C from Go without Cgo!")
 	purego.RegisterLibFunc(&_eglBindAPI, lib, "eglBindAPI")
+	purego.RegisterLibFunc(&_eglGetConfigs, lib, "eglGetConfigs")
+	purego.RegisterLibFunc(&_eglChooseConfig, lib, "eglChooseConfig")
+	purego.RegisterLibFunc(&_eglCreateContext, lib, "eglCreateContext")
+	purego.RegisterLibFunc(&_eglCreatePbufferSurface, lib, "eglCreatePbufferSurface")
+	purego.RegisterLibFunc(&_eglCreatePixmapSurface, lib, "eglCreatePixmapSurface")
+	purego.RegisterLibFunc(&_eglCreateWindowSurface, lib, "eglCreateWindowSurface")
+	purego.RegisterLibFunc(&_eglDestroyContext, lib, "eglDestroyContext")
+	purego.RegisterLibFunc(&_eglDestroySurface, lib, "eglDestroySurface")
+	purego.RegisterLibFunc(&_eglGetConfigAttrib, lib, "eglGetConfigAttrib")
+	purego.RegisterLibFunc(&_eglGetCurrentSurface, lib, "eglGetCurrentSurface")
+	purego.RegisterLibFunc(&_eglGetDisplay, lib, "eglGetDisplay")
+	purego.RegisterLibFunc(&_eglInitialize, lib, "eglInitialize")
+	purego.RegisterLibFunc(&_eglMakeCurrent, lib, "eglMakeCurrent")
+	purego.RegisterLibFunc(&_eglQueryContext, lib, "eglQueryContext")
+	purego.RegisterLibFunc(&_eglQueryString, lib, "eglQueryString")
+	purego.RegisterLibFunc(&_eglQuerySurface, lib, "eglQuerySurface")
+	purego.RegisterLibFunc(&_eglSwapBuffers, lib, "eglSwapBuffers")
+	purego.RegisterLibFunc(&_eglTerminate, lib, "eglTerminate")
+	purego.RegisterLibFunc(&_eglWaitNative, lib, "eglWaitNative")
+	purego.RegisterLibFunc(&_eglGetCurrentDisplay, lib, "eglGetCurrentDisplay")
+	purego.RegisterLibFunc(&_eglGetProcAddress, lib, "eglGetProcAddress")
+	purego.RegisterLibFunc(&_eglGetError, lib, "eglGetError")
+	purego.RegisterLibFunc(&_eglWaitGL, lib, "eglWaitGL")
+	purego.RegisterLibFunc(&_eglQueryAPI, lib, "eglQueryAPI")
+	purego.RegisterLibFunc(&_eglCreatePbufferFromClientBuffer, lib, "eglCreatePbufferFromClientBuffer")
+	purego.RegisterLibFunc(&_eglReleaseThread, lib, "eglReleaseThread")
+	purego.RegisterLibFunc(&_eglWaitClient, lib, "eglWaitClient")
+	purego.RegisterLibFunc(&_eglBindTexImage, lib, "eglBindTexImage")
+	purego.RegisterLibFunc(&_eglReleaseTexImage, lib, "eglReleaseTexImage")
+	purego.RegisterLibFunc(&_eglSurfaceAttrib, lib, "eglSurfaceAttrib")
+	purego.RegisterLibFunc(&_eglSwapInterval, lib, "eglSwapInterval")
+
 	purego.RegisterLibFunc(&EglGetPlatformDisplay, lib, "eglGetPlatformDisplay")
 	purego.RegisterLibFunc(&EglCreatePlatformWindowSurface, lib, "eglCreatePlatformWindowSurface")
 	return nil
@@ -71,7 +124,7 @@ func getLibEGL() string {
 }
 
 func EglBindAPI(api uint) bool {
-	if ret := _eglBindAPI(EGLenum(api)); ret != C.EGL_TRUE {
+	if ret := _eglBindAPI(EGLenum(api)); ret != EGL_TRUE {
 		return false
 	}
 	return true
@@ -81,7 +134,7 @@ func EglGetConfigs(disp EGLDisplay, configs []EGLConfig, configSize int, numConf
 	var num_config EGLint
 	config_size := EGLint(configSize)
 	if configs == nil {
-		if C.eglGetConfigs(disp, nil, 0, &num_config) != C.EGL_TRUE {
+		if _eglGetConfigs(disp, nil, 0, &num_config) != EGL_TRUE {
 			return false
 		}
 		if numConfig != nil {
@@ -89,7 +142,7 @@ func EglGetConfigs(disp EGLDisplay, configs []EGLConfig, configSize int, numConf
 		}
 		return true
 	}
-	if C.eglGetConfigs(disp, &configs[0], config_size, &num_config) != C.EGL_TRUE {
+	if _eglGetConfigs(disp, &configs[0], config_size, &num_config) != EGL_TRUE {
 		return false
 	}
 	if numConfig != nil {
@@ -99,86 +152,86 @@ func EglGetConfigs(disp EGLDisplay, configs []EGLConfig, configSize int, numConf
 }
 
 func EglChooseConfig(disp EGLDisplay, attribs []EGLint) (EGLConfig, bool) {
-	var cfg C.EGLConfig
-	var ncfg C.EGLint
-	if C.eglChooseConfig(disp, &attribs[0], &cfg, 1, &ncfg) != C.EGL_TRUE {
+	var cfg EGLConfig
+	var ncfg EGLint
+	if _eglChooseConfig(disp, &attribs[0], &cfg, 1, &ncfg) != EGL_TRUE {
 		return NilEGLConfig, false
 	}
 	return EGLConfig(cfg), true
 }
 
 func EglCreateContext(disp EGLDisplay, cfg EGLConfig, shareCtx EGLContext, attribs []EGLint) EGLContext {
-	ctx := C.eglCreateContext(disp, cfg, shareCtx, &attribs[0])
+	ctx := _eglCreateContext(disp, cfg, shareCtx, &attribs[0])
 	return EGLContext(ctx)
 }
 
 func EglDestroySurface(disp EGLDisplay, surf EGLSurface) bool {
-	return C.eglDestroySurface(disp, surf) == C.EGL_TRUE
+	return _eglDestroySurface(disp, surf) == EGL_TRUE
 }
 
 func EglDestroyContext(disp EGLDisplay, ctx EGLContext) bool {
-	return C.eglDestroyContext(disp, ctx) == C.EGL_TRUE
+	return _eglDestroyContext(disp, ctx) == EGL_TRUE
 }
 
 func EglGetConfigAttrib(disp EGLDisplay, cfg EGLConfig, attr EGLint) (EGLint, bool) {
 	var val EGLint
-	ret := C.eglGetConfigAttrib(disp, cfg, attr, &val)
-	return val, ret == C.EGL_TRUE
+	ret := _eglGetConfigAttrib(disp, cfg, attr, &val)
+	return val, ret == EGL_TRUE
 }
 
 func EglGetError() EGLint {
-	return C.eglGetError()
+	return _eglGetError()
 }
 
 func EglInitialize(disp EGLDisplay) (EGLint, EGLint, bool) {
 	var maj, min EGLint
-	ret := C.eglInitialize(disp, &maj, &min)
-	return maj, min, ret == C.EGL_TRUE
+	ret := _eglInitialize(disp, &maj, &min)
+	return maj, min, ret == EGL_TRUE
 }
 
 func EglMakeCurrent(disp EGLDisplay, draw, read EGLSurface, ctx EGLContext) bool {
-	return C.eglMakeCurrent(disp, draw, read, ctx) == C.EGL_TRUE
+	return _eglMakeCurrent(disp, draw, read, ctx) == EGL_TRUE
 }
 
 func EglReleaseThread() bool {
-	return C.eglReleaseThread() == C.EGL_TRUE
+	return _eglReleaseThread() == EGL_TRUE
 }
 
 func EglSwapBuffers(disp EGLDisplay, surf EGLSurface) bool {
-	return C.eglSwapBuffers(disp, surf) == C.EGL_TRUE
+	return _eglSwapBuffers(disp, surf) == EGL_TRUE
 }
 
 func EglSwapInterval(disp EGLDisplay, interval EGLint) bool {
-	return C.eglSwapInterval(disp, interval) == C.EGL_TRUE
+	return _eglSwapInterval(disp, interval) == EGL_TRUE
 }
 
 func EglTerminate(disp EGLDisplay) bool {
-	return C.eglTerminate(disp) == C.EGL_TRUE
+	return _eglTerminate(disp) == EGL_TRUE
 }
 
 func EglQueryString(disp EGLDisplay, name EGLint) string {
-	return C.GoString(C.eglQueryString(disp, name))
+	return _eglQueryString(disp, name)
 }
 
-func EglGetDisplay(disp NativeDisplayType) EGLDisplay {
-	return C.eglGetDisplay(disp)
+func EglGetDisplay(disp EGLNativeDisplayType) EGLDisplay {
+	return _eglGetDisplay(disp)
 }
 
-func EglCreateWindowSurface(disp EGLDisplay, conf EGLConfig, win NativeWindowType, attribs []EGLint) EGLSurface {
-	eglSurf := C.eglCreateWindowSurface(disp, conf, win, &attribs[0])
+func EglCreateWindowSurface(disp EGLDisplay, conf EGLConfig, win EGLNativeWindowType, attribs []EGLint) EGLSurface {
+	eglSurf := _eglCreateWindowSurface(disp, conf, win, &attribs[0])
 	return eglSurf
 }
 
 // func EglGetPlatformDisplay(att uint32, conn unsafe.Pointer, attribs []EGLAttrib) EGLDisplay {
-// 	eglSurf := C.eglGetPlatformDisplay(C.uint(att), conn, &attribs[0])
+// 	eglSurf := _eglGetPlatformDisplay(_uint(att), conn, &attribs[0])
 // 	return eglSurf
 // }
 
 // func EglCreatePlatformWindowSurface(disp EGLDisplay, conf EGLConfig, win PtrXcbWindow, attribs *XCBAttrib) EGLSurface {
-// 	eglSurf := C.libwsi_eglCreatePlatformWindowSurface(disp, conf, win, nil)
+// 	eglSurf := _libwsi_eglCreatePlatformWindowSurface(disp, conf, win, nil)
 // 	return eglSurf
 // }
 
 func EglWaitClient() bool {
-	return C.eglWaitClient() == C.EGL_TRUE
+	return _eglWaitClient() == EGL_TRUE
 }

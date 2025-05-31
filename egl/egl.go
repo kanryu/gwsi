@@ -10,7 +10,7 @@ var (
 	NilEGLSurface       EGLSurface
 	NilEGLContext       EGLContext
 	NilEGLConfig        EGLConfig
-	EGL_DEFAULT_DISPLAY NativeDisplayType
+	EGL_DEFAULT_DISPLAY EGLNativeDisplayType
 )
 
 const (
