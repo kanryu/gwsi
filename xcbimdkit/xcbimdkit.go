@@ -155,6 +155,15 @@ func createIcCallback(im PtrXcbXim, new_ic XcbXicT, user_data uintptr) {
 	}
 }
 
+// Checks whether the key event is trapped by IME.
+// Requires libxcb-imdkit.so to work, and returns false if it does not exist.
+func PluginXcbXimFilterEvent(im PtrXcbXim, event *xcb.XcbGenericEventT) bool {
+	if !LibLoaded {
+		return false
+	}
+	return XcbXimFilterEvent(im, event)
+}
+
 func OpenCallback(im PtrXcbXim, user_data uintptr) {
 	fmt.Print("open_callback")
 	input_style := XCB_IM_PreeditPosition | XCB_IM_StatusArea
@@ -217,9 +226,18 @@ func LoadEGLXcbImdkit() error {
 	if LibLoaded {
 		return nil
 	}
-	lib, err := purego.Dlopen(getLibXcbImdkit(), purego.RTLD_NOW|purego.RTLD_GLOBAL)
+	var lib uintptr
+	var err error
+	for _, libname := range getLibXcbImdkit() {
+		lib, err = purego.Dlopen(libname, purego.RTLD_NOW|purego.RTLD_GLOBAL)
+		if lib != 0 {
+			break
+		}
+	}
 	if err != nil {
-		panic(err)
+		//panic(err)
+		fmt.Printf("libxcb-imdkit is required to support IME, but it cannot be found\nError: %s\n", err.Error())
+		return err
 	}
 	purego.RegisterLibFunc(&XcbXimCreate, lib, "xcb_xim_create")
 	purego.RegisterLibFunc(&XcbXimOpen, lib, "xcb_xim_open")
@@ -243,12 +261,12 @@ func LoadEGLXcbImdkit() error {
 	return nil
 }
 
-func getLibXcbImdkit() string {
+func getLibXcbImdkit() []string {
 	switch runtime.GOOS {
 	case "darwin":
-		return "/usr/lib/libSystem.B.dylib"
+		return []string{"/usr/lib/libSystem.B.dylib"}
 	case "linux":
-		return "libxcb-imdkit.so"
+		return []string{"libxcb-imdkit.so.1", "libxcb-imdkit.so"}
 	default:
 		panic(fmt.Errorf("GOOS=%s is not supported", runtime.GOOS))
 	}

@@ -2,7 +2,6 @@ package gwsi
 
 /*
 #cgo linux,!android pkg-config: xcb
-#cgo linux,!android pkg-config: xcb-imdkit
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
@@ -152,10 +151,12 @@ func (p *WsiPlatform) CreateWindow(pCreateInfo *WsiWindowCreateInfo, title strin
 	C.xcb_map_window(p.xcb_connection, window.XcbWindow)
 	C.xcb_flush(p.xcb_connection)
 
-	// // Open connection to XIM server.
-	// C.gwsi_xcb_xim_open(p.xcb_im, true, unsafe.Pointer(p))
-	xcbimdkit.RegisterCreateIcCallback(wsiSetXicCallback2)
-	xcbimdkit.XcbXimOpen(xcbimdkit.PtrXcbXim(unsafe.Pointer(p.xcb_im)), xcbimdkit.OpenCallback, true, uintptr(unsafe.Pointer(p)))
+	if xcbimdkit.LibLoaded {
+		// // Open connection to XIM server.
+		// C.gwsi_xcb_xim_open(p.xcb_im, true, unsafe.Pointer(p))
+		xcbimdkit.RegisterCreateIcCallback(wsiSetXicCallback2)
+		xcbimdkit.XcbXimOpen(xcbimdkit.PtrXcbXim(unsafe.Pointer(p.xcb_im)), xcbimdkit.OpenCallback, true, uintptr(unsafe.Pointer(p)))
+	}
 
 	p.WindowList = append(p.WindowList, window)
 	return window, WSI_SUCCESS
