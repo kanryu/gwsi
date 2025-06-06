@@ -10,19 +10,12 @@ package gwsi
 
 #include <xcb/xcb.h>
 #include <xcb/xcb_keysyms.h>
-#include <xcb-imdkit/encoding.h>
-#include <xcb-imdkit/encoding.h>
-#include <xcb-imdkit/ximproto.h>
-#include <xcb-imdkit/imclient.h>
-extern xcb_window_t xcb_window;
-extern void create_ic_callback(xcb_xim_t *im, xcb_xic_t new_ic, void *user_data);
-extern void open_callback(xcb_xim_t *im, void *user_data);
-extern bool gwsi_xcb_xim_open(xcb_xim_t *im,
-	bool auto_connect, void *user_data);
+
 */
 import "C"
 import (
 	"fmt"
+	"gwsi/xcbimdkit"
 	"unsafe"
 )
 
@@ -78,9 +71,15 @@ func wsi_window_xcb_client_message(window *WsiWindow, event *C.xcb_client_messag
 }
 
 //export wsiSetXicCallback
-func wsiSetXicCallback(new_ic C.xcb_xic_t, userData unsafe.Pointer) {
+// func wsiSetXicCallback(new_ic C.xcb_xic_t, userData unsafe.Pointer) {
+// 	fmt.Println("wsi_set_xic_callback")
+// 	p := (*WsiPlatform)(userData)
+// 	p.xcb_xic = new_ic
+// }
+
+func wsiSetXicCallback2(im xcbimdkit.PtrXcbXim, new_ic xcbimdkit.XcbXicT, userData uintptr) {
 	fmt.Println("wsi_set_xic_callback")
-	p := (*WsiPlatform)(userData)
+	p := (*WsiPlatform)(unsafe.Pointer(userData))
 	p.xcb_xic = new_ic
 }
 
@@ -96,7 +95,7 @@ func (p *WsiPlatform) CreateWindow(pCreateInfo *WsiWindowCreateInfo, title strin
 		ConfigureWindow: pCreateInfo.ConfigureWindow,
 		CloseWindow:     pCreateInfo.CloseWindow,
 	}
-	C.xcb_window = window.XcbWindow
+	//C.xcb_window = window.XcbWindow
 
 	if pCreateInfo.Parent != nil {
 		window.XcbParent = pCreateInfo.Parent.XcbWindow
@@ -153,8 +152,10 @@ func (p *WsiPlatform) CreateWindow(pCreateInfo *WsiWindowCreateInfo, title strin
 	C.xcb_map_window(p.xcb_connection, window.XcbWindow)
 	C.xcb_flush(p.xcb_connection)
 
-	// Open connection to XIM server.
-	C.gwsi_xcb_xim_open(p.xcb_im, true, unsafe.Pointer(p))
+	// // Open connection to XIM server.
+	// C.gwsi_xcb_xim_open(p.xcb_im, true, unsafe.Pointer(p))
+	xcbimdkit.RegisterCreateIcCallback(wsiSetXicCallback2)
+	xcbimdkit.XcbXimOpen(xcbimdkit.PtrXcbXim(unsafe.Pointer(p.xcb_im)), xcbimdkit.OpenCallback, true, uintptr(unsafe.Pointer(p)))
 
 	p.WindowList = append(p.WindowList, window)
 	return window, WSI_SUCCESS

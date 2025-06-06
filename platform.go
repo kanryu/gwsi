@@ -7,23 +7,13 @@ package gwsi
 
 #include <xcb/xcb.h>
 #include <xcb/xcb_keysyms.h>
-#include <xcb-imdkit/encoding.h>
-#include <xcb-imdkit/encoding.h>
-#include <xcb-imdkit/ximproto.h>
-#include <xcb-imdkit/imclient.h>
 
-extern xcb_xim_im_callback callback;
-
-extern void forward_event(xcb_xim_t *im, xcb_xic_t ic, xcb_key_press_event_t *event,
-                   void *user_data);
-extern void commit_string(xcb_xim_t *im, xcb_xic_t ic, uint32_t flag, char *str,
-                   uint32_t length, uint32_t *keysym, size_t nKeySym,
-                   void *user_data);
-extern void disconnected(xcb_xim_t *im, void *user_data);
 */
 import "C"
 import (
 	"fmt"
+	"gwsi/xcb"
+	"gwsi/xcbimdkit"
 	"unsafe"
 )
 
@@ -32,12 +22,16 @@ type WsiPlatform struct {
 	xcb_screen                *C.xcb_screen_t
 	xcb_screen_id             C.int
 	xcb_key_symbols           *C.xcb_key_symbols_t
-	xcb_im                    *C.xcb_xim_t
-	xcb_xic                   C.xcb_xic_t
-	xim_callback              C.xcb_xim_im_callback
 	xcb_atom_wm_protocols     C.xcb_atom_t
 	xcb_atom_wm_delete_window C.xcb_atom_t
-	WindowList                []*WsiWindow
+
+	//xcb_im *C.xcb_xim_t
+	//xcb_xic         C.xcb_xic_t
+	//xim_callback              C.xcb_xim_im_callback
+	xcb_im  xcbimdkit.PtrXcbXim
+	xcb_xic xcbimdkit.XcbXicT
+
+	WindowList []*WsiWindow
 }
 
 var (
@@ -119,7 +113,8 @@ func WsiCreatePlatform(pCreateInfo *WsiPlatformCreateInfo) (*WsiPlatform, error)
 
 	wsi_list_init(platform.WindowList)
 	// Init global state for compound text encoding.
-	C.xcb_compound_text_init()
+	//C.xcb_compound_text_init()
+	xcbimdkit.XcbCompoundTextInit()
 	platform.xcb_connection = C.xcb_connect(nil, &platform.xcb_screen_id)
 	defer func() {
 		if result != WSI_SUCCESS {
@@ -148,15 +143,24 @@ func WsiCreatePlatform(pCreateInfo *WsiPlatformCreateInfo) (*WsiPlatform, error)
 
 	platform.InitAtoms()
 
-	platform.xcb_im = C.xcb_xim_create(platform.xcb_connection, C.int(platform.xcb_screen_id), nil)
+	//platform.xcb_im = C.xcb_xim_create(platform.xcb_connection, C.int(platform.xcb_screen_id), nil)
+	platform.xcb_im = xcbimdkit.XcbXimCreate(xcbimdkit.PtrXcbConnectionT(unsafe.Pointer(platform.xcb_connection)), int32(platform.xcb_screen_id), nil)
 
-	C.xcb_xim_set_im_callback(platform.xcb_im, &C.callback, nil)
+	//fmt.Printf("sizeof(C.callback): %d\n", unsafe.Sizeof(C.callback))
+	fmt.Printf("sizeof(xcbimdkit.ImCallback): %d\n", unsafe.Sizeof(xcbimdkit.ImCallback))
+
+	//C.xcb_xim_set_im_callback(platform.xcb_im, &C.callback, nil)
+	xcbimdkit.XcbXimSetImCallback(platform.xcb_im, &xcbimdkit.ImCallback, 0)
+
 	//C.xcb_xim_set_log_handler(platform.xcb_im, logger)
-	C.xcb_xim_set_use_compound_text(platform.xcb_im, true)
-	C.xcb_xim_set_use_utf8_string(platform.xcb_im, true)
+	// C.xcb_xim_set_use_compound_text(platform.xcb_im, true)
+	// C.xcb_xim_set_use_utf8_string(platform.xcb_im, true)
+	xcbimdkit.XcbXimSetUseCompoundText(platform.xcb_im, true)
+	xcbimdkit.XcbXimSetUseUtf8String(platform.xcb_im, true)
 
-	// // Open connection to XIM server.
-	// C.xcb_xim_open(platform.xcb_im, open_callback, true, nil)
+	// Open connection to XIM server.
+	//C.xcb_xim_open(platform.xcb_im, open_callback, true, nil)
+	xcbimdkit.XcbXimOpen(xcbimdkit.PtrXcbXim(unsafe.Pointer(platform.xcb_im)), xcbimdkit.OpenCallback, true, 0)
 
 	result = WSI_SUCCESS
 	return platform, nil
@@ -168,13 +172,18 @@ func (p *WsiPlatform) Destroy() {
 
 func (p *WsiPlatform) DispatchEvents(timeout int64) WsiResult {
 	for {
-		event := C.xcb_poll_for_event(p.xcb_connection)
+		//event := C.xcb_poll_for_event(p.xcb_connection)
+		var conn xcb.PtrXcbConnection
+		conn = xcb.PtrXcbConnection(unsafe.Pointer(p.xcb_connection))
+		event := xcb.XcbPollForEvent(conn)
 		if event == nil {
 			break
 		}
-		evtp := event.response_type & 0x7f
+		//evtp := event.response_type & 0x7f
+		evtp := event.ResponseType & 0x7f
 		//fmt.Println("DispatchEvents:", event.response_type)
-		if p.xcb_im == nil || !C.xcb_xim_filter_event(p.xcb_im, event) {
+		//if p.xcb_im == nil || !C.xcb_xim_filter_event(p.xcb_im, event) {
+		if p.xcb_im == 0 || !xcbimdkit.XcbXimFilterEvent(xcbimdkit.PtrXcbXim(unsafe.Pointer(p.xcb_im)), event) {
 			switch evtp {
 			case C.XCB_CONFIGURE_NOTIFY:
 				fmt.Println("DispatchEvents:", "XCB_CONFIGURE_NOTIFY", event)
@@ -204,12 +213,14 @@ func (p *WsiPlatform) DispatchEvents(timeout int64) WsiResult {
 				fmt.Println("DispatchEvents:", "XCB_KEY_PRESS", event)
 				// Forward event to input method if IC is created.
 				if p.xcb_xic != 0 {
-					C.xcb_xim_forward_event(p.xcb_im, p.xcb_xic, (*C.xcb_key_press_event_t)(unsafe.Pointer(event)))
+					//C.xcb_xim_forward_event(p.xcb_im, p.xcb_xic, (*C.xcb_key_press_event_t)(unsafe.Pointer(event)))
+					xcbimdkit.XcbXimForwardEvent(xcbimdkit.PtrXcbXim(unsafe.Pointer(p.xcb_im)), p.xcb_xic, event)
 				}
 			case C.XCB_KEYMAP_NOTIFY:
 				fmt.Println("DispatchEvents:", "XCB_KEYMAP_NOTIFY", event)
 			default:
-				fmt.Println("DispatchEvents:", event.response_type, event)
+				//fmt.Println("DispatchEvents:", event.response_type, event)
+				fmt.Println("DispatchEvents:", event.ResponseType, event)
 			}
 		}
 

@@ -14,9 +14,6 @@ import (
 #include <assert.h>
 
 #include <xcb/xcb.h>
-
-#include <EGL/egl.h>
-#include <EGL/eglext.h>
 */
 import "C"
 

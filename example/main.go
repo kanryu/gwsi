@@ -11,6 +11,8 @@ import (
 	"gwsi"
 	"gwsi/egl"
 	"gwsi/linux"
+	"gwsi/xcb"
+	"gwsi/xcbimdkit"
 )
 
 const (
@@ -273,6 +275,8 @@ func main() {
 	var ok bool
 	last_time := linux.GetTimeNs()
 	gwsi.WsiEglInit()
+	xcb.LoadXcb()
+	xcbimdkit.LoadEGLXcbImdkit()
 	platform_info := gwsi.WsiPlatformCreateInfo{
 		Type: gwsi.WSI_STRUCTURE_TYPE_PLATFORM_CREATE_INFO,
 	}
