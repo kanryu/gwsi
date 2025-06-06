@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"math"
 	"runtime"
+	"time"
 	"unsafe"
 
 	"github.com/go-gl/gl/v2.1/gl"
 
 	"gwsi"
 	"gwsi/egl"
-	"gwsi/linux"
 	"gwsi/xcb"
 	"gwsi/xcbimdkit"
 )
@@ -273,7 +273,10 @@ func main() {
 	var num_configs egl.EGLint
 	var major, minor egl.EGLint
 	var ok bool
-	last_time := linux.GetTimeNs()
+
+	//	last_time := linux.GetTimeNs()
+	last_time := time.Now()
+
 	gwsi.WsiEglInit()
 	xcb.LoadXcb()
 	xcbimdkit.LoadEGLXcbImdkit()
@@ -383,7 +386,8 @@ func main() {
 
 	create_gears()
 
-	last_time = linux.GetTimeNs()
+	//last_time = linux.GetTimeNs()
+	last_time = time.Now()
 
 	for {
 		draw()
@@ -394,8 +398,11 @@ func main() {
 			break
 		}
 
-		now := linux.GetTimeNs()
-		dt := now - last_time
+		// now := linux.GetTimeNs()
+		// dt := now - last_time
+		// last_time = now
+		now := time.Now()
+		dt := now.Sub(last_time)
 		last_time = now
 
 		time := float64(dt) / 1000000000.0
