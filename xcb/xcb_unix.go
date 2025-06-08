@@ -9,12 +9,17 @@ import "C"
 import (
 	"fmt"
 	"runtime"
+	"unsafe"
 
 	"github.com/ebitengine/purego"
 )
 
 type (
+	XcbAtom       uint32
+	XcbButton     uint8
+	XcbKeycode    uint8
 	XcbScreenId   int32
+	XcbTimestamp  uint32
 	XcbVoidCookie uint32
 	XcbWindow     uint32
 
@@ -35,6 +40,137 @@ type XcbGenericEventT struct {
 	Sequence     uint16    /* Sequence number */
 	pad          [7]uint32 /* Padding */
 	FullSequence uint32    /* full sequence */
+}
+
+type XcbConfigureNotifyEventT struct {
+	ResponseType     uint8
+	pad0             uint8
+	Sequence         uint16
+	Event            XcbWindow
+	Window           XcbWindow
+	AboveSibling     XcbWindow
+	X                int16
+	Y                int16
+	Width            uint16
+	Height           uint16
+	BorderWidth      uint16
+	OverrideRedirect uint8
+	pad1             uint8
+}
+
+type XcbClientMessageEventT struct {
+	ResponseType uint8
+	Format       uint8
+	Sequence     uint16
+	Window       XcbWindow
+	Type         XcbAtom
+	Data         XcbClientMessageData
+}
+
+type XcbExposeEventT struct {
+	ResponseType uint8
+	pad0         uint8
+	Sequence     uint16
+	Window       XcbWindow
+	X            uint16
+	Y            uint16
+	Width        uint16
+	Height       uint16
+	Count        uint16
+	pad1         [2]uint8
+}
+
+type XcbButtonPressEventT struct {
+	ResponseType uint8 /* The type of the event, here it is xcb_button_press_event_t or xcb_button_release_event_t */
+	Detail       XcbButton
+	Sequence     uint16
+	Time         XcbTimestamp /* Time, in milliseconds the event took place in */
+	Root         XcbWindow
+	Event        XcbWindow
+	Child        XcbWindow
+	RootX        int16
+	RootY        int16
+	EventX       int16  /* The x coordinate where the mouse has been pressed in the window */
+	EventY       int16  /* The y coordinate where the mouse has been pressed in the window */
+	State        uint16 /* A mask of the buttons (or keys) during the event */
+	SameScreen   uint8
+}
+type XcbMapNotifyEventT struct {
+	ResponseType     uint8
+	pad0             uint8
+	Sequence         uint16
+	Event            XcbWindow
+	Window           XcbWindow
+	OverrideRedirect uint8
+	pad1             [3]uint8
+}
+type XcbReparentNotifyEventT struct {
+	ResponseType     uint8 /* The type of the event, here it is xcb_button_press_event_t or xcb_button_release_event_t */
+	pad0             uint8
+	Sequence         uint16
+	Event            XcbWindow
+	Window           XcbWindow
+	Parent           XcbWindow
+	X                int16
+	Y                int16
+	OverrideRedirect uint8
+	pad1             [3]uint8
+}
+type XcbKeyPressEventT struct {
+	ResponseType uint8 /* The type of the event, here it is xcb_button_press_event_t or xcb_button_release_event_t */
+	Detail       XcbKeycode
+	Sequence     uint16
+	Time         XcbTimestamp /* Time, in milliseconds the event took place in */
+	Root         XcbWindow
+	Event        XcbWindow
+	Child        XcbWindow
+	RootX        int16
+	RootY        int16
+	EventX       int16  /* The x coordinate where the mouse has been pressed in the window */
+	EventY       int16  /* The y coordinate where the mouse has been pressed in the window */
+	State        uint16 /* A mask of the buttons (or keys) during the event */
+	SameScreen   uint8
+	pad0         uint8
+}
+type XcbKeymapNotifyEventT struct {
+	ResponseType uint8 /* The type of the event, here it is xcb_button_press_event_t or xcb_button_release_event_t */
+	Keys         [31]uint8
+}
+
+type XcbClientMessageData struct {
+	Data8 [20]byte
+}
+
+func (e *XcbGenericEventT) AsXcbConfigureNotifyEventT() *XcbConfigureNotifyEventT {
+	return (*XcbConfigureNotifyEventT)(unsafe.Pointer(e))
+}
+
+func (e *XcbGenericEventT) AsXcbClientMessageEventT() *XcbClientMessageEventT {
+	return (*XcbClientMessageEventT)(unsafe.Pointer(e))
+}
+
+func (e *XcbGenericEventT) AsXcbExposeEventT() *XcbExposeEventT {
+	return (*XcbExposeEventT)(unsafe.Pointer(e))
+}
+
+func (e *XcbGenericEventT) AsXcbButtonPressEventT() *XcbButtonPressEventT {
+	return (*XcbButtonPressEventT)(unsafe.Pointer(e))
+}
+
+func (e *XcbGenericEventT) AsXcbMapNotifyEventT() *XcbMapNotifyEventT {
+	return (*XcbMapNotifyEventT)(unsafe.Pointer(e))
+}
+
+func (e *XcbGenericEventT) AsXcbReparentNotifyEventT() *XcbReparentNotifyEventT {
+	return (*XcbReparentNotifyEventT)(unsafe.Pointer(e))
+}
+
+func (e *XcbGenericEventT) AsXcbKeyPressEventT() *XcbKeyPressEventT {
+	return (*XcbKeyPressEventT)(unsafe.Pointer(e))
+}
+
+func (e *XcbGenericEventT) AsXcbKeymapNotifyEventT() *XcbKeymapNotifyEventT {
+	return (*XcbKeymapNotifyEventT)(unsafe.Pointer(e))
 }
 
 // XcbAtom

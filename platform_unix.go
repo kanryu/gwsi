@@ -93,9 +93,9 @@ func wsi_xcb_get_screen(setup *C.xcb_setup_t, screen int) *C.xcb_screen_t {
 	return nil
 }
 
-func (p *WsiPlatform) FindWindow(window C.xcb_window_t) *WsiWindow {
+func (p *WsiPlatform) FindWindow(window xcb.XcbWindow) *WsiWindow {
 	for _, w := range p.WindowList {
-		if w.XcbWindow == window {
+		if w.XcbWindow == C.uint(window) {
 			return w
 		}
 	}
@@ -150,7 +150,7 @@ func WsiCreatePlatform(pCreateInfo *WsiPlatformCreateInfo) (*WsiPlatform, error)
 		xcbimdkit.XcbXimSetUseUtf8String(platform.xcb_im, true)
 
 		// Open connection to XIM server.
-		xcbimdkit.XcbXimOpen(xcbimdkit.PtrXcbXim(unsafe.Pointer(platform.xcb_im)), xcbimdkit.OpenCallback, true, 0)
+		xcbimdkit.XcbXimOpen(platform.xcb_im, xcbimdkit.OpenCallback, true, 0)
 	}
 
 	result = WSI_SUCCESS
@@ -170,42 +170,55 @@ func (p *WsiPlatform) DispatchEvents(timeout int64) WsiResult {
 			break
 		}
 		evtp := event.ResponseType & 0x7f
-		xim_filtered := xcbimdkit.PluginXcbXimFilterEvent(xcbimdkit.PtrXcbXim(unsafe.Pointer(p.xcb_im)), event)
+		xim_filtered := xcbimdkit.PluginXcbXimFilterEvent(p.xcb_im, event)
 		if p.xcb_im == 0 || !xim_filtered {
 			switch evtp {
 			case C.XCB_CONFIGURE_NOTIFY:
-				fmt.Println("DispatchEvents:", "XCB_CONFIGURE_NOTIFY", event)
-				notify := (*C.xcb_configure_notify_event_t)(unsafe.Pointer(event))
-				window := p.FindWindow(notify.window)
+				notify := event.AsXcbConfigureNotifyEventT()
+				fmt.Println("DispatchEvents:", "XCB_CONFIGURE_NOTIFY", notify)
+				window := p.FindWindow(notify.Window)
 				if window != nil {
 					wsi_window_xcb_configure_notify(window, notify)
 				}
 			case C.XCB_CLIENT_MESSAGE:
-				message := (*C.xcb_client_message_event_t)(unsafe.Pointer(event))
+				message := event.AsXcbClientMessageEventT()
 
-				window := p.FindWindow(message.window)
+				window := p.FindWindow(message.Window)
 				if window != nil {
 					wsi_window_xcb_client_message(window, message)
 				}
 			case C.XCB_EXPOSE:
-				fmt.Println("DispatchEvents:", "XCB_EXPOSE", event)
+				expose := event.AsXcbExposeEventT()
+				fmt.Println("DispatchEvents:", "XCB_EXPOSE", expose)
 			case C.XCB_BUTTON_PRESS:
-				fmt.Println("DispatchEvents:", "XCB_BUTTON_PRESS", event)
+				button := event.AsXcbButtonPressEventT()
+				fmt.Println("DispatchEvents:", "XCB_BUTTON_PRESS", button)
 			case C.XCB_BUTTON_RELEASE:
-				fmt.Println("DispatchEvents:", "XCB_BUTTON_RELEASE", event)
+				button := event.AsXcbButtonPressEventT()
+				fmt.Println("DispatchEvents:", "XCB_BUTTON_RELEASE", button)
 			case C.XCB_MAP_NOTIFY:
-				fmt.Println("DispatchEvents:", "XCB_MAP_NOTIFY", event)
+				notify := event.AsXcbMapNotifyEventT()
+				fmt.Println("DispatchEvents:", "XCB_MAP_NOTIFY", notify)
 			case C.XCB_REPARENT_NOTIFY:
-				fmt.Println("DispatchEvents:", "XCB_REPARENT_NOTIFY", event)
-			case C.XCB_KEY_PRESS, C.XCB_KEY_RELEASE:
-				fmt.Println("DispatchEvents:", "XCB_KEY_PRESS", event)
+				notify := event.AsXcbReparentNotifyEventT()
+				fmt.Println("DispatchEvents:", "XCB_REPARENT_NOTIFY", notify)
+			case C.XCB_KEY_PRESS:
+				notify := event.AsXcbKeyPressEventT()
+				fmt.Println("DispatchEvents:", "XCB_KEY_PRESS", notify)
 				// Forward event to input method if IC is created.
 				if p.xcb_xic != 0 {
-					//C.xcb_xim_forward_event(p.xcb_im, p.xcb_xic, (*C.xcb_key_press_event_t)(unsafe.Pointer(event)))
+					xcbimdkit.XcbXimForwardEvent(xcbimdkit.PtrXcbXim(unsafe.Pointer(p.xcb_im)), p.xcb_xic, event)
+				}
+			case C.XCB_KEY_RELEASE:
+				notify := event.AsXcbKeyPressEventT()
+				fmt.Println("DispatchEvents:", "XCB_KEY_RELEASE", notify)
+				// Forward event to input method if IC is created.
+				if p.xcb_xic != 0 {
 					xcbimdkit.XcbXimForwardEvent(xcbimdkit.PtrXcbXim(unsafe.Pointer(p.xcb_im)), p.xcb_xic, event)
 				}
 			case C.XCB_KEYMAP_NOTIFY:
-				fmt.Println("DispatchEvents:", "XCB_KEYMAP_NOTIFY", event)
+				notify := event.AsXcbKeymapNotifyEventT()
+				fmt.Println("DispatchEvents:", "XCB_KEYMAP_NOTIFY", notify)
 			default:
 				//fmt.Println("DispatchEvents:", event.response_type, event)
 				fmt.Println("DispatchEvents:", event.ResponseType, event)

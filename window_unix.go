@@ -14,6 +14,7 @@ package gwsi
 import "C"
 import (
 	"fmt"
+	"gwsi/xcb"
 	"gwsi/xcbimdkit"
 	"unsafe"
 )
@@ -33,33 +34,33 @@ type WsiWindow struct {
 
 // region XCB Events
 
-func wsi_window_xcb_configure_notify(window *WsiWindow, event *C.xcb_configure_notify_event_t) {
+func wsi_window_xcb_configure_notify(window *WsiWindow, event *xcb.XcbConfigureNotifyEventT) {
 
 	info := WsiConfigureWindowEvent{
 		Base: WsiEvent{
 			Type:   WSI_EVENT_TYPE_CONFIGURE_WINDOW,
 			Flags:  0,
-			Serial: uint32(event.sequence),
+			Serial: uint32(event.Sequence),
 		},
 		Window: window,
 		Extent: WsiExtent{
-			Width:  int32(event.width),
-			Height: int32(event.height),
+			Width:  int32(event.Width),
+			Height: int32(event.Height),
 		},
 	}
 
 	window.ConfigureWindow(window.UserData, &info)
 }
 
-func wsi_window_xcb_client_message(window *WsiWindow, event *C.xcb_client_message_event_t) {
-	data32 := (*uint32)(unsafe.Pointer(&event.data))
-	if event._type == window.Platform.xcb_atom_wm_protocols &&
+func wsi_window_xcb_client_message(window *WsiWindow, event *xcb.XcbClientMessageEventT) {
+	data32 := (*uint32)(unsafe.Pointer(&event.Data))
+	if C.uint(event.Type) == window.Platform.xcb_atom_wm_protocols &&
 		*data32 == uint32(window.Platform.xcb_atom_wm_delete_window) {
 		info := &WsiCloseWindowEvent{
 			Base: WsiEvent{
 				Type:   WSI_EVENT_TYPE_CLOSE_WINDOW,
 				Flags:  0,
-				Serial: uint32(event.sequence),
+				Serial: uint32(event.Sequence),
 				Time:   0,
 			},
 			Window: window,
@@ -69,20 +70,11 @@ func wsi_window_xcb_client_message(window *WsiWindow, event *C.xcb_client_messag
 	}
 }
 
-//export wsiSetXicCallback
-// func wsiSetXicCallback(new_ic C.xcb_xic_t, userData unsafe.Pointer) {
-// 	fmt.Println("wsi_set_xic_callback")
-// 	p := (*WsiPlatform)(userData)
-// 	p.xcb_xic = new_ic
-// }
-
 func wsiSetXicCallback2(im xcbimdkit.PtrXcbXim, new_ic xcbimdkit.XcbXicT, userData uintptr) {
 	fmt.Println("wsi_set_xic_callback")
 	p := (*WsiPlatform)(unsafe.Pointer(userData))
 	p.xcb_xic = new_ic
 }
-
-// endregion
 
 func (p *WsiPlatform) CreateWindow(pCreateInfo *WsiWindowCreateInfo, title string) (*WsiWindow, WsiResult) {
 	window := &WsiWindow{

@@ -236,7 +236,8 @@ func LoadEGLXcbImdkit() error {
 	}
 	if err != nil {
 		//panic(err)
-		fmt.Printf("libxcb-imdkit is required to support IME, but it cannot be found\nError: %s\n", err.Error())
+		fmt.Println("mado-worning: libxcb-imdkit is required to support IME, but it cannot be found")
+		fmt.Println("Error:", err.Error())
 		return err
 	}
 	purego.RegisterLibFunc(&XcbXimCreate, lib, "xcb_xim_create")
